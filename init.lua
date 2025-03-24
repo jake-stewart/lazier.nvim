@@ -22,7 +22,7 @@ vim.api.nvim_create_user_command("LazierUpdate", function()
         result = { result }
     end
     if vim.v.shell_error == 0 then
-        package["lazier.version"] = nil
+        package.loaded["lazier.version"] = nil
         local newVersion = require("lazier.version")
         if newVersion == oldVersion then
             vim.print("Already up to date. (" .. newVersion .. ")")
