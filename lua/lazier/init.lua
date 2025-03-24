@@ -7,12 +7,11 @@ end
 
 vim.api.nvim_create_user_command("LazierUpdate", function()
     local separator = vim.fn.has('macunix') == 1 and "/" or "\\"
-    local luaDir = table.concat({ vim.fn.stdpath("data"), "site", "lua" }, separator)
-    local repoDir = table.concat({ luaDir, "lazier" }, separator)
+    local repoDir = table.concat({ vim.fn.stdpath("data"), "lazier.nvim" }, separator)
     --- @diagnostic disable-next-line
     local _, err = vim.uv.fs_lstat(repoDir)
     if err then
-        error(err)
+        error("Failed to find lazier repo at '" .. repoDir .. "': " .. tostring(error))
     end
     printHl("Title", "Updating Lazier...")
     vim.print()
