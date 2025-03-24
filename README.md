@@ -8,14 +8,14 @@ be lazy loaded:
 
 ```lua
 return {
-    "jake-stewart/multicursor.nvim",
+    "repo/some-plugin.nvim",
     opts = {},
     keys = {
-        "<leader>h", function()
-            require("multicursor-nvim").prevCursor()
+        "<leader>a", function()
+            require("some-plugin").doSomething()
         end,
-        "<leader>l", function()
-            require("multicursor-nvim").nextCursor()
+        "<leader>b", function()
+            vim.cmd.DoSomethingElse()
         end
     }
 }
@@ -27,12 +27,12 @@ lazy loading automatically:
 
 ```lua
 return require "lazier" {
-    "jake-stewart/multicursor.nvim",
+    "repo/some-plugin.nvim",
     config = function()
-        local mc = require("multicursor-nvim")
-        mc.setup()
-        vim.keymap.set("n", "<leader>h", mc.prevCursor)
-        vim.keymap.set("n", "<leader>l", mc.nextCursor)
+        local plugin = require("some-plugin")
+        plugin.setup({})
+        vim.keymap.set("n", "<leader>a", plugin.doSomething)
+        vim.keymap.set("n", "<leader>b", vim.cmd.DoSomethingElse)
     end
 }
 ```
