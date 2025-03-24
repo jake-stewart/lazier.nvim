@@ -1,10 +1,10 @@
 # lazier.nvim
-lazier is a wrapper around [lazy.nvim](https://lazy.folke.io/) which lets you
+Lazier is a wrapper around [lazy.nvim](https://lazy.folke.io/) and lets you
 have lazy loaded plugins without any extra effort.
 
 ### Before:
-Normally, we define the mappings within the `keys` field so that the plugin
-can be lazy loaded:
+Normally, we define mappings within the `keys` field so that the plugin can
+be lazy loaded:
 
 ```lua
 return {
@@ -12,10 +12,10 @@ return {
     opts = {},
     keys = {
         "<leader>h", function()
-            require("multicursorn-vim").prevCursor()
+            require("multicursor-nvim").prevCursor()
         end,
         "<leader>l", function()
-            require("multicursorn-vim").nextCursor()
+            require("multicursor-nvim").nextCursor()
         end
     }
 }
@@ -60,7 +60,7 @@ vim.opt.runtimepath:prepend(lazierpath)
 ## How it works
 When your `config` function is called, the Neovim API is wrapped so that
 their calls can be captured. This lets us keep track of which keys should be
-used for lazy loading automatically. Requiring a module returns a proxy
-object that keeps track the operations that occur. These operations are only
-applied once the plugin is loaded. This lets you configure and use plugin as
-though it were loaded, your operations only taking once it actually loads.
+used for lazy loading. Requiring a module returns a proxy object that keeps
+track the operations that occur. These operations are only applied once the
+plugin is loaded. This lets you configure and use a plugin as though it were
+loaded with your operations only taking once it actually loads.
