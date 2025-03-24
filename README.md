@@ -59,7 +59,7 @@ vim.opt.runtimepath:prepend(lazierPath)
 
 ## What's supported
 The following functions and objects are supported. Any operations using them
-not occur until the plugin has loaded:
+will not occur until the plugin has loaded:
 - `vim.keymap.set`
 - `vim.api.nvim_set_hl`
 - `vim.cmd`
