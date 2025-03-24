@@ -57,6 +57,16 @@ end
 vim.opt.runtimepath:prepend(lazierPath)
 ```
 
+## What's supported
+The following functions and objects are supported. Any operations using them
+not occur until the plugin has loaded:
+- `vim.keymap.set`
+- `vim.api.nvim_set_hl`
+- `vim.cmd`
+- `vim.api.nvim_create_autocmd`
+- `vim.api.nvim_create_augroup`
+- Any module that is imported with `require`
+
 ## How it works
 When your `config` function is called, the Neovim API is wrapped so that
 their calls can be captured. This lets us keep track of which keys should be
