@@ -16,12 +16,19 @@ vim.api.nvim_create_user_command("LazierUpdate", function()
     end
     printHl("Title", "Updating Lazier...")
     vim.print()
+    local oldVersion = require("lazier.version")
     local result = vim.fn.systemlist({ "git", "-C", repoDir, "pull" })
     if type(result) == "string" then
         result = { result }
     end
     if vim.v.shell_error == 0 then
-        vim.print("Update completed successfully.")
+        package["lazier.version"] = nil
+        local newVersion = require("lazier.version")
+        if newVersion == oldVersion then
+            vim.print("Already up to date. (" .. newVersion .. ")")
+        else
+            vim.print("Update completed successfully. (v" .. oldVersion .. " -> v" .. newVersion .. ")")
+        end
     else
         printHl("Error",
             "Update failed with status " .. vim.v.shell_error)
