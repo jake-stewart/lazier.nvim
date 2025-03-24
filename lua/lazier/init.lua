@@ -9,7 +9,7 @@ vim.api.nvim_create_user_command("LazierUpdate", function()
     local separator = vim.fn.has('macunix') == 1 and "/" or "\\"
     local repoDir = table.concat({ vim.fn.stdpath("data"), "lazier.nvim" }, separator)
     --- @diagnostic disable-next-line
-    local _, err = vim.uv.fs_lstat(repoDir)
+    local _, err = (vim.uv or vim.loop).fs_lstat(repoDir)
     if err then
         error("Failed to find lazier repo at '" .. repoDir .. "': " .. tostring(error))
     end
@@ -81,14 +81,13 @@ local function plug(opts)
     --- @diagnostic disable-next-line
     success, newConfigOrError = pcall(opts.config)
     _G.require = oldRequire
+    vim.cmd = oldCmd
     for _, wrapper in ipairs(allWrappers) do
         wrapper.obj[wrapper.name] = wrapper.original
     end
     if not success then
         error(newConfigOrError)
     end
-
-    vim.cmd = oldCmd
 
     if #keymaps.calls > 0 then
         opts.keys = opts.keys or {}
