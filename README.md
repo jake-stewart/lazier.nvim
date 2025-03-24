@@ -43,18 +43,18 @@ Make sure lazy.nvim is installed by following
 Then, add this code to your `init.lua`:
 
 ```lua
-local lazierpath = vim.fn.stdpath("data") .. "/lazier.nvim"
-if not (vim.loop.fs_stat(lazierpath)) then
-    vim.fn.system({
-        "git",
-        "clone",
-        "--filter=blob:none",
-        "https://github.com/jake-stewart/lazier.nvim.git",
-        "--branch=stable",
-        lazierpath
-    })
+local lazierPath = vim.fn.stdpath("data") .. "/lazier.nvim"
+if not (vim.uv or vim.loop).fs_stat(lazierPath) then
+    local repo = "https://github.com/jake-stewart/lazier.nvim.git"
+    local out = vim.fn.system({
+        "git", "clone", "--branch=stable", repo, lazierPath })
+    if vim.v.shell_error ~= 0 then
+        vim.api.nvim_echo({{
+            "Failed to clone lazier.nvim:\n" .. out, "Error"
+        }}, true, {})
+    end
 end
-vim.opt.runtimepath:prepend(lazierpath)
+vim.opt.runtimepath:prepend(lazierPath)
 ```
 
 ## How it works
