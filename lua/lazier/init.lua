@@ -10,7 +10,7 @@ vim.api.nvim_create_user_command("LazierUpdate", function()
     }
     local repoDir
     for _, candidate in ipairs(repoDirLocations) do
-        local stat = (vim.uv or vim.loop).fs_lstat(repoDir)
+        local stat = (vim.uv or vim.loop).fs_lstat(candidate)
         if stat then
             repoDir = candidate
             break
