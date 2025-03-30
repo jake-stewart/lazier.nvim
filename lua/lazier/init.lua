@@ -51,6 +51,7 @@ local Lazier = {
 --- @param opts LazyPluginSpec
 --- @return LazyPluginSpec
 function Lazier.__call(_, opts)
+    --return opts
     return require("lazier.wrap")(opts)
 end
 

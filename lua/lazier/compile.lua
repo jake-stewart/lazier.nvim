@@ -172,13 +172,11 @@ local function compilePlugins(module, transpiledFile)
                 spec.opts = preCompile("__opts(" .. compile(pluginPath) .. ")")
             end
         end
-        if plugin.config then
-            useConfigFunc = true
-            spec.config = preCompile("__config(" .. compile(pluginPath) .. ")")
-        end
+        useConfigFunc = true
+        spec.config = preCompile("__config(" .. compile(pluginPath) .. ")")
         if plugin.setup then
             useSetupFunc = true
-            spec.config = preCompile("__setup(" .. compile(pluginPath) .. ")")
+            spec.setup = preCompile("__setup(" .. compile(pluginPath) .. ")")
         end
         if lazyPlugin.keys then
             spec.keys = {}
@@ -199,13 +197,13 @@ local function compilePlugins(module, transpiledFile)
 
     local configFunc = "local function __config(module)\n"
         .. "    return function(...)\n"
-        .. "        return require(module).config(...)\n"
+        .. "        require(\"lazier.config\")(module, ...)\n"
         .. "    end\n"
         .. "end\n"
 
     local setupFunc = "local function __setup(module)\n"
         .. "    return function(...)\n"
-        .. "        return require(module).setup(...)\n"
+        .. "        require(module).setup(...)\n"
         .. "    end\n"
         .. "end\n"
 
