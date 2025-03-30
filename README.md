@@ -37,6 +37,16 @@ return require "lazier" {
 }
 ```
 
+### What's Supported
+The following functions and objects are supported. Any operations using them
+will not occur until the plugin has loaded:
+- `vim.keymap.set`
+- `vim.api.nvim_set_hl`
+- `vim.cmd`
+- `vim.api.nvim_create_autocmd`
+- `vim.api.nvim_create_augroup`
+- Any module that is imported with `require`
+
 ## Faster Startup Time
 You can use use `lazier` inplace of `lazy` to get a quicker startup time.
 There are two optimizations:
@@ -90,16 +100,6 @@ if not (vim.uv or vim.loop).fs_stat(lazierPath) then
 end
 vim.opt.runtimepath:prepend(lazierPath)
 ```
-
-## What's Supported
-The following functions and objects are supported. Any operations using them
-will not occur until the plugin has loaded:
-- `vim.keymap.set`
-- `vim.api.nvim_set_hl`
-- `vim.cmd`
-- `vim.api.nvim_create_autocmd`
-- `vim.api.nvim_create_augroup`
-- Any module that is imported with `require`
 
 ## How it Works
 When your `config` function is called, the Neovim API is wrapped so that
