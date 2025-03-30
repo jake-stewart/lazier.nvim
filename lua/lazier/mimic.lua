@@ -46,6 +46,10 @@ MimicMetatable.__concat = binary(function(a, b) return a .. b end)
 --- @mimic T
 --- @return T
 local function createMimic(obj, mimic)
+    setmetatable(obj, nil)
+    for k in pairs(obj) do
+        obj[k] = nil
+    end
     obj._mimic = mimic
     return setmetatable(obj, MimicMetatable)
 end

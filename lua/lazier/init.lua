@@ -1,17 +1,23 @@
-local Recorder = require("lazier.recorder")
-local Mimic = require("lazier.mimic")
-
 local function printHl(hl, message)
     vim.api.nvim_echo({{ message, hl } }, true, {})
 end
 
 vim.api.nvim_create_user_command("LazierUpdate", function()
     local separator = vim.fn.has('macunix') == 1 and "/" or "\\"
-    local repoDir = table.concat({ vim.fn.stdpath("data"), "lazier.nvim" }, separator)
-    --- @diagnostic disable-next-line
-    local _, err = (vim.uv or vim.loop).fs_lstat(repoDir)
-    if err then
-        error("Failed to find lazier repo at '" .. repoDir .. "': " .. tostring(error))
+    local repoDirLocations = {
+        table.concat({ vim.fn.stdpath("data"), "lazier", "lazier.nvim" }, separator),
+        table.concat({ vim.fn.stdpath("data"), "lazier.nvim" }, separator),
+    }
+    local repoDir
+    for _, candidate in ipairs(repoDirLocations) do
+        local stat = (vim.uv or vim.loop).fs_lstat(repoDir)
+        if stat then
+            repoDir = candidate
+            break
+        end
+    end
+    if not repoDir then
+        error("Failed to find lazier repo")
     end
     printHl("Title", "Updating Lazier...")
     vim.print()
@@ -37,103 +43,19 @@ vim.api.nvim_create_user_command("LazierUpdate", function()
     end
 end, {})
 
+
+local Lazier = {
+    compiled = false
+}
+
 --- @param opts LazyPluginSpec
 --- @return LazyPluginSpec
-local function plug(opts)
-    opts = opts or {}
-    if opts.enabled == false
-        or opts.lazy == false
-        or type(opts.config) ~= "function"
-    then
-        return opts
-    end
-    local keymaps = { obj = vim.keymap, name = "set" };
-    local allWrappers = {
-        keymaps,
-        { obj = vim.api, name = "nvim_set_hl" },
-        { obj = vim.api, name = "nvim_create_augroup" },
-        { obj = vim.api, name = "nvim_create_autocmd" },
-    }
-
-    local moduleRecorders = {}
-    local oldCmd = vim.cmd
-    local cmdRecorder = Recorder.new()
-
-    local oldRequire = _G.require
-    --- @diagnostic disable-next-line
-    _G.require = function(name)
-        local r = moduleRecorders[name]
-        if not r then
-            r = Recorder.new()
-            moduleRecorders[name] = r
-        end
-        return r
-    end
-
-    for _, wrapper in ipairs(allWrappers) do
-        wrapper.original = wrapper.obj[wrapper.name]
-        wrapper.calls = {}
-        wrapper.obj[wrapper.name] = function(...)
-            table.insert(wrapper.calls, {...})
-        end
-    end
-    local success, newConfigOrError
-    --- @diagnostic disable-next-line
-    success, newConfigOrError = pcall(opts.config)
-    _G.require = oldRequire
-    vim.cmd = oldCmd
-    for _, wrapper in ipairs(allWrappers) do
-        wrapper.obj[wrapper.name] = wrapper.original
-    end
-    if not success then
-        error(newConfigOrError)
-    end
-
-    if #keymaps.calls > 0 then
-        opts.keys = opts.keys or {}
-        if type(opts.keys) ~= "table" then
-            error("expected table for 'keys'")
-        end
-        for _, keymap in ipairs(keymaps.calls) do
-            --- @diagnostic disable-next-line
-            table.insert(opts.keys,
-                { keymap[2], mode = keymap[1] })
-        end
-    end
-
-    opts.config = function()
-        for k, v in pairs(moduleRecorders) do
-            local module = require(k)
-            for _, item in ipairs(v._list) do
-                Recorder.eval(item, module)
-            end
-        end
-        for _, item in ipairs(cmdRecorder._list) do
-            Recorder.eval(item, nil)
-        end
-
-        for _, wrapper in ipairs(allWrappers) do
-            for _, call in ipairs(wrapper.calls) do
-                for i, v in ipairs(call) do
-                    call[i] = Recorder.eval(v, nil)
-                end
-                wrapper.obj[wrapper.name](table.unpack(call))
-            end
-        end
-
-        for k, v in pairs(moduleRecorders) do
-            setmetatable(v, nil)
-            for key in pairs(v) do
-                v[key] = nil
-            end
-            Mimic.new(v, require(k))
-        end
-        if newConfigOrError then
-            newConfigOrError()
-        end
-    end
-
-    return opts
+function Lazier.__call(_, opts)
+    return require("lazier.wrap")(opts)
 end
 
-return plug
+function Lazier.setup(module, opts)
+    return require("lazier.setup")(module, opts)
+end
+
+return setmetatable(Lazier, Lazier)
