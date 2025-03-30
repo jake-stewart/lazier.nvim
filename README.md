@@ -37,6 +37,40 @@ return require "lazier" {
 }
 ```
 
+## Faster Startup Time
+You can use use `lazier` inplace of `lazy` to get a quicker startup time.
+There are two optimizations:
+ - Delays starting `lazy.nvim` until after Neovim has launched.
+ - Compiles your plugin spec into a single file when it changes.
+
+```lua
+require("lazier").setup("plugins", {
+    lazier = {
+        after = function()
+            -- function to run after lazy.nvim starts.
+            -- you can use this for further custom lazy loading.
+            -- eg: require("mappings")
+        end,
+        start_lazily = function()
+            -- function which returns whether lazy.nvim
+            -- should start delayed or not.
+            local nonLazyLoadableExtensions = {
+                zip = true,
+                tar = true,
+                gz = true
+            }
+            local fname = vim.fn.expand("%")
+            return fname == ""
+                or vim.fn.isdirectory(fname) == 0
+                and not nonLazyLoadableExtensions
+                    [vim.fn.fnamemodify(fname, ":e")]
+        end
+    },
+    -- lazy.nvim config
+})
+```
+
+
 ## Install Instructions (macOS/Linux)
 Make sure lazy.nvim is installed by following
 [their instructions](https://lazy.folke.io/installation).
@@ -57,7 +91,7 @@ end
 vim.opt.runtimepath:prepend(lazierPath)
 ```
 
-## What's supported
+## What's Supported
 The following functions and objects are supported. Any operations using them
 will not occur until the plugin has loaded:
 - `vim.keymap.set`
@@ -67,7 +101,7 @@ will not occur until the plugin has loaded:
 - `vim.api.nvim_create_augroup`
 - Any module that is imported with `require`
 
-## How it works
+## How it Works
 When your `config` function is called, the Neovim API is wrapped so that
 their calls can be captured. This lets us keep track of which keys should be
 used for lazy loading. Requiring a module returns a proxy object that keeps
