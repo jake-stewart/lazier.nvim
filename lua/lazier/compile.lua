@@ -128,6 +128,7 @@ local function compilePlugins(module, transpiledFile)
     local useConfigFunc = false
     local useSetupFunc = false
     local useOptsFunc = false
+    local useKeymapFunc = false
 
     local lazyUtil = require("lazy.core.util")
     lazyUtil.lsmod(module, function(pluginPath)
@@ -172,20 +173,29 @@ local function compilePlugins(module, transpiledFile)
                 spec.opts = preCompile("__opts(" .. compile(pluginPath) .. ")")
             end
         end
-        useConfigFunc = true
-        spec.config = preCompile("__config(" .. compile(pluginPath) .. ")")
+        if plugin.config then
+            useConfigFunc = true
+            spec.config = preCompile("__config(" .. compile(pluginPath) .. ")")
+        end
         if plugin.setup then
             useSetupFunc = true
             spec.setup = preCompile("__setup(" .. compile(pluginPath) .. ")")
         end
         if lazyPlugin.keys then
             spec.keys = {}
-            for _, key in pairs(lazyPlugin.keys) do
+            for i, key in pairs(lazyPlugin.keys) do
                 if type(key) == "string" then
                     table.insert(spec.keys, key)
                 else
-                    if key.mode and key.mode ~= "n" then
-                        table.insert(spec.keys, { key[1], mode = key.mode })
+                    local rhs = nil
+                    if type(key[2]) == "string" then
+                        rhs = key[2]
+                    elseif type(key[2]) == "function" then
+                        useKeymapFunc = true
+                        rhs = preCompile("__keymap(" .. compile(pluginPath) .. ", " .. i .. ")")
+                    end
+                    if key.mode and key.mode ~= "n" or rhs ~= nil then
+                        table.insert(spec.keys, { key[1], rhs, mode = key.mode })
                     else
                         table.insert(spec.keys, key[1])
                     end
@@ -197,7 +207,7 @@ local function compilePlugins(module, transpiledFile)
 
     local configFunc = "local function __config(module)\n"
         .. "    return function(...)\n"
-        .. "        require(\"lazier.config\")(module, ...)\n"
+        .. "        require(module).config(...)\n"
         .. "    end\n"
         .. "end\n"
 
@@ -211,9 +221,16 @@ local function compilePlugins(module, transpiledFile)
         .. "    return require(module).opts\n"
         .. "end\n"
 
+    local keymapFunc = "local function __keymap(module, idx)\n"
+        .. "    return function(...)\n"
+        .. "        require(module)[idx](...)\n"
+        .. "    end\n"
+        .. "end\n"
+
     local compiled = (useConfigFunc and configFunc or "")
         .. (useSetupFunc and setupFunc or "")
         .. (useOptsFunc and optsFunc or "")
+        .. (useKeymapFunc and keymapFunc or "")
         .. "return " .. compile(specPlugins, 0, 80 - 7)
 
     writeFile(transpiledFile, compiled)
