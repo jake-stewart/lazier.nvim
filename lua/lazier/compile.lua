@@ -223,7 +223,7 @@ local function compilePlugins(module, transpiledFile)
 
     local keymapFunc = "local function __keymap(module, idx)\n"
         .. "    return function(...)\n"
-        .. "        require(module)[idx](...)\n"
+        .. "        require(module).keys[idx][2](...)\n"
         .. "    end\n"
         .. "end\n"
 
