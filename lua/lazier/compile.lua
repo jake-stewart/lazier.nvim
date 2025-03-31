@@ -183,7 +183,7 @@ local function compilePlugins(module, transpiledFile)
         end
         if lazyPlugin.keys then
             spec.keys = {}
-            for i, key in pairs(lazyPlugin.keys) do
+            for i, key in ipairs(lazyPlugin.keys) do
                 if type(key) == "string" then
                     table.insert(spec.keys, key)
                 else
