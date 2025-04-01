@@ -14,7 +14,14 @@ end
 return function(path)
     local bundle = require("lazier.bundle")({
         modules = {
-            "lazier.setup"
+            "lazier.setup",
+            "lazier.wrap",
+            "lazier.mimic",
+            "lazier.recorder",
+            "lazier.compile",
+            "lazier.bundle",
+            "lazier.version",
+            "lazier.npack",
         },
         customModules = {},
         paths = {}

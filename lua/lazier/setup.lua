@@ -109,6 +109,7 @@ local function checkCache(cacheFile, compiledFile)
             and cache.colorscheme
             or vim.g.colors_name,
         colorRtp = cache and cache.colorRtp,
+        bundle_plugins = cache and cache.bundle_plugins,
         tally = tally,
         version = vim.v.version
     }
@@ -125,6 +126,7 @@ end
 return function(module, opts)
     opts = opts or {}
     opts.lazier = opts.lazier or {}
+    opts.lazier.bundle_plugins = opts.lazier.bundle_plugins or false
 
     local function start_lazily()
         if type(opts.lazier.start_lazily) == "function" then
@@ -150,17 +152,19 @@ return function(module, opts)
     local compiledFile = table.concat({ dataDir, "compiled.lua" }, separator)
     local cacheFile = table.concat({ dataDir, "cache.json" }, separator)
     local modified, cache = checkCache(cacheFile, compiledFile)
-    if modified then
+    if modified or cache.bundle_plugins ~= opts.lazier.bundle_plugins then
         if opts.lazier.before then
             opts.lazier.before()
         end
         require("lazy").setup(module, opts)
-        local result = require("lazier.compile")(module, compiledFile)
+        local result = require("lazier.compile")(
+            module, compiledFile, opts.lazier.bundle_plugins)
         if opts.lazier.after then
             opts.lazier.after()
         end
         cache.colorscheme = vim.g.colors_name
         cache.colorRtp = result.colorRtp
+        cache.bundle_plugins = opts.lazier.bundle_plugins
         writeFile(cacheFile, vim.json.encode(cache))
         return
     end
@@ -188,9 +192,11 @@ return function(module, opts)
             end
 
             if vim.g.colors_name ~= cache.colorscheme then
-                local result = require("lazier.compile")(module, compiledFile)
+                local result = require("lazier.compile")(
+                    module, compiledFile, opts.lazier.bundle_plugins)
                 cache.colorscheme = vim.g.colors_name
                 cache.colorRtp = result.colorRtp
+                cache.bundle_plugins = opts.lazier.bundle_plugins
                 writeFile(cacheFile, vim.json.encode(cache))
             end
             if vim.o.ft ~= "" then
@@ -203,9 +209,11 @@ return function(module, opts)
             opts.lazier.after()
         end
         if vim.g.colors_name ~= cache.colorscheme then
-            local result = require("lazier.compile")(module, compiledFile)
+            local result = require("lazier.compile")(
+                module, compiledFile, opts.lazier.bundle_plugins)
             cache.colorscheme = vim.g.colors_name
             cache.colorRtp = result.colorRtp
+            cache.bundle_plugins = opts.lazier.bundle_plugins
             writeFile(cacheFile, vim.json.encode(cache))
         end
     end

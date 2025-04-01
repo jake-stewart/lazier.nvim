@@ -52,6 +52,7 @@ return function()
     end
     if vim.v.shell_error == 0 then
         package.loaded["lazier.version"] = nil
+        package.preload["lazier.version"] = nil
         local newVersion = require("lazier.version")
         if newVersion == oldVersion then
             vim.print("Already up to date. (" .. newVersion .. ")")
