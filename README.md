@@ -49,18 +49,27 @@ will not occur until the plugin has loaded:
 
 ## Faster Startup Time
 You can use use `lazier` inplace of `lazy` to get a quicker startup time.
-There are two optimizations:
+There are many optimizations:
  - Delays starting `lazy.nvim` until after Neovim has launched.
  - Compiles your plugin spec into a single file when it changes.
+ - Bundles and bytecode compiles part of the Neovim Lua API and
+   your config files.
 
 ```lua
 require("lazier").setup("plugins", {
     lazier = {
+        before = function()
+            -- function to run before the ui renders.
+            -- it is faster to require parts of your config here
+            -- since at this point they will be bundled and bytecode compiled.
+            -- eg: require("options")
+        end,
+
         after = function()
-            -- function to run after lazy.nvim starts.
-            -- you can use this for further custom lazy loading.
+            -- function to run after the ui renders.
             -- eg: require("mappings")
         end,
+
         start_lazily = function()
             -- function which returns whether lazy.nvim
             -- should start delayed or not.
@@ -74,9 +83,15 @@ require("lazier").setup("plugins", {
                 or vim.fn.isdirectory(fname) == 0
                 and not nonLazyLoadableExtensions
                     [vim.fn.fnamemodify(fname, ":e")]
-        end
+        end,
+
+        -- whether plugins should be included in the bytecode
+        -- compiled bundle. this will make your startup slower.
+        bundle_plugins = false
     },
-    -- lazy.nvim config
+
+    -- your usual lazy.nvim config goes here
+    -- ...
 })
 ```
 
