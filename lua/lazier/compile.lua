@@ -11,6 +11,10 @@ local function writeFile(path, data)
     assert(uv.fs_close(fd))
 end
 
+local function deleteFile(path)
+    assert(uv.fs_unlink(path))
+end
+
 local function preCompile(s)
     return setmetatable({ code = s }, PreCompiled)
 end
@@ -39,9 +43,7 @@ local RESERVED_WORDS = {
     ["while"] = true
 }
 
--- local function x()
---     yield 5
--- end
+
 
 local function validIdentifier(s)
     if type(s) ~= "string" then
@@ -116,7 +118,7 @@ local function canCompile(o)
     end
 end
 
-local function compilePlugins(module, transpiledFile)
+local function compilePlugins(module, compiledFile)
     local lazy = require("lazy")
     local specPlugins = {}
 
@@ -126,7 +128,7 @@ local function compilePlugins(module, transpiledFile)
     local lazyPlugins = lazy.plugins()
 
     local useConfigFunc = false
-    local useSetupFunc = false
+    local useInitFunc = false
     local useOptsFunc = false
     local useKeymapFunc = false
 
@@ -177,9 +179,9 @@ local function compilePlugins(module, transpiledFile)
             useConfigFunc = true
             spec.config = preCompile("__config(" .. compile(pluginPath) .. ")")
         end
-        if plugin.setup then
-            useSetupFunc = true
-            spec.setup = preCompile("__setup(" .. compile(pluginPath) .. ")")
+        if plugin.init then
+            useInitFunc = true
+            spec.init = preCompile("__init(" .. compile(pluginPath) .. ")")
         end
         if lazyPlugin.keys then
             spec.keys = {}
@@ -211,9 +213,9 @@ local function compilePlugins(module, transpiledFile)
         .. "    end\n"
         .. "end\n"
 
-    local setupFunc = "local function __setup(module)\n"
+    local initFunc = "local function __init(module)\n"
         .. "    return function(...)\n"
-        .. "        require(module).setup(...)\n"
+        .. "        require(module).init(...)\n"
         .. "    end\n"
         .. "end\n"
 
@@ -228,12 +230,46 @@ local function compilePlugins(module, transpiledFile)
         .. "end\n"
 
     local compiled = (useConfigFunc and configFunc or "")
-        .. (useSetupFunc and setupFunc or "")
+        .. (useInitFunc and initFunc or "")
         .. (useOptsFunc and optsFunc or "")
         .. (useKeymapFunc and keymapFunc or "")
         .. "return " .. compile(specPlugins, 0, 80 - 7)
 
-    writeFile(transpiledFile, compiled)
+
+    local bundled = require("lazier.bundle")({
+        modules = {
+            "vim.func",
+            "vim.func._memoize",
+            "vim.loader",
+            "vim.uri",
+            "vim.F",
+            "vim.fs",
+            "vim.hl",
+            "vim.treesitter.highlighter",
+            "vim.treesitter.query",
+            "vim.treesitter.languagetree",
+            "vim.treesitter.language",
+            "vim.treesitter._range",
+            "vim.treesitter",
+            "vim.filetype",
+            "vim.diagnostic",
+        },
+        paths = {
+            vim.fn.stdpath("config") .. "/lua"
+        },
+        custom_modules = {
+            lazierbundle = compiled
+        }
+    })
+
+    writeFile(compiledFile, bundled)
+    local chunk, err = loadfile(compiledFile, "t", {})
+    if chunk then
+        writeFile(compiledFile, string.dump(chunk))
+    else
+        deleteFile(compiledFile)
+        error("failed to compile bytecode: " .. tostring(err))
+    end
 
     return {
         colorRtp = colorRtp

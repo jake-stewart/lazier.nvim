@@ -25,7 +25,20 @@ local function mkdir(path)
     return uv.fs_mkdir(path, 511)
 end
 
-local function checkDirModified(root, modifiedSince)
+local function checkModifiedFile(file, modifiedSince)
+    local stat = uv.fs_stat(file)
+    if stat.type == "file" then
+        if stat.mtime.sec > modifiedSince
+            or stat.ctime.sec > modifiedSince
+        then
+            return true, 1
+        end
+        return false, 1
+    end
+    return false, 0
+end
+
+local function checkModifiedTree(root, modifiedSince)
     local handle = assert(uv.fs_scandir(root))
     local modified = false
     local tally = 0
@@ -45,17 +58,22 @@ local function checkDirModified(root, modifiedSince)
             then
                 modified = true
             end
+        elseif type == "directory" then
+            local childModified, childTally =
+                checkModifiedTree(path, modifiedSince)
+            modified = modified or childModified
+            tally = tally + childTally
         end
     end
 end
 
-local function checkCache(cacheFile, sourcePath, transpiledFile)
+local function checkCache(cacheFile, compiledFile)
     local recompile = false
     local lastModified = 0
     local lastTally = 0
     local cache
     local success, contents = pcall(readFile, cacheFile)
-    if not success or not fileExists(transpiledFile) then
+    if not success or not fileExists(compiledFile) then
         recompile = true
     else
         cache = vim.json.decode(contents)
@@ -65,9 +83,24 @@ local function checkCache(cacheFile, sourcePath, transpiledFile)
             lastModified = cache.modified
             lastTally = cache.tally
         end
+        if cache.version ~= vim.v.version then
+            recompile = true
+        end
     end
 
-    local modified, tally = checkDirModified(sourcePath, lastModified)
+    local configDir = vim.fn.stdpath("config")
+    local sourcePath = configDir .. "/lua"
+
+    local modified, tally = checkModifiedTree(sourcePath, lastModified)
+    for _, file in ipairs({
+        "lazy-lock.json"
+    }) do
+        local fileModified, fileTally =
+            checkModifiedFile(configDir .. "/" .. file, lastModified)
+        modified = modified or fileModified
+        tally = tally + fileTally
+    end
+
     recompile = recompile or modified or tally ~= lastTally
     local timestamp = tonumber(vim.fn.strftime('%s'))
     cache = {
@@ -77,6 +110,7 @@ local function checkCache(cacheFile, sourcePath, transpiledFile)
             or vim.g.colors_name,
         colorRtp = cache and cache.colorRtp,
         tally = tally,
+        version = vim.v.version
     }
     return recompile, cache
 end
@@ -113,14 +147,15 @@ return function(module, opts)
     local separator = vim.fn.has('macunix') == 1 and "/" or "\\"
     local dataDir = table.concat({ vim.fn.stdpath("data"), "lazier" }, separator)
     ensureDirExists(dataDir)
-    local transpiledFile = table.concat({ dataDir, "transpiled.lua" }, separator)
+    local compiledFile = table.concat({ dataDir, "compiled.lua" }, separator)
     local cacheFile = table.concat({ dataDir, "cache.json" }, separator)
-    local modulePath = module:gsub("%.", separator)
-    local sourcePath = table.concat({ vim.fn.stdpath("config"), "lua", modulePath }, separator)
-    local modified, cache = checkCache(cacheFile, sourcePath, transpiledFile)
+    local modified, cache = checkCache(cacheFile, compiledFile)
     if modified then
+        if opts.lazier.before then
+            opts.lazier.before()
+        end
         require("lazy").setup(module, opts)
-        local result = require("lazier.compile")(module, transpiledFile)
+        local result = require("lazier.compile")(module, compiledFile)
         if opts.lazier.after then
             opts.lazier.after()
         end
@@ -132,6 +167,11 @@ return function(module, opts)
 
     state.compiled = true
 
+    loadfile(compiledFile, "b")()
+    if opts.lazier.before then
+        opts.lazier.before()
+    end
+
     if start_lazily() then
         local loadplugins = vim.o.loadplugins
         vim.o.loadplugins = false
@@ -139,14 +179,16 @@ return function(module, opts)
             vim.opt.rtp:append(cache.colorRtp)
             vim.cmd.colorscheme(cache.colorscheme)
         end
+
         vim.schedule(function()
             vim.o.loadplugins = loadplugins
-            require("lazy").setup(loadfile(transpiledFile)(), opts)
+            require("lazy").setup(require("lazierbundle"), opts)
             if opts.lazier.after then
                 opts.lazier.after()
             end
+
             if vim.g.colors_name ~= cache.colorscheme then
-                local result = require("lazier.compile")(module, transpiledFile)
+                local result = require("lazier.compile")(module, compiledFile)
                 cache.colorscheme = vim.g.colors_name
                 cache.colorRtp = result.colorRtp
                 writeFile(cacheFile, vim.json.encode(cache))
@@ -156,12 +198,12 @@ return function(module, opts)
             end
         end)
     else
-        require("lazy").setup(loadfile(transpiledFile)(), opts)
+        require("lazy").setup(require("lazierbundle"), opts)
         if opts.lazier.after then
             opts.lazier.after()
         end
         if vim.g.colors_name ~= cache.colorscheme then
-            local result = require("lazier.compile")(module, transpiledFile)
+            local result = require("lazier.compile")(module, compiledFile)
             cache.colorscheme = vim.g.colors_name
             cache.colorRtp = result.colorRtp
             writeFile(cacheFile, vim.json.encode(cache))
