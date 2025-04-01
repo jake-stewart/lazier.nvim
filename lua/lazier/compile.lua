@@ -126,7 +126,7 @@ local function compilePlugins(module, transpiledFile)
     local lazyPlugins = lazy.plugins()
 
     local useConfigFunc = false
-    local useSetupFunc = false
+    local useInitFunc = false
     local useOptsFunc = false
     local useKeymapFunc = false
 
@@ -177,9 +177,9 @@ local function compilePlugins(module, transpiledFile)
             useConfigFunc = true
             spec.config = preCompile("__config(" .. compile(pluginPath) .. ")")
         end
-        if plugin.setup then
-            useSetupFunc = true
-            spec.setup = preCompile("__setup(" .. compile(pluginPath) .. ")")
+        if plugin.init then
+            useInitFunc = true
+            spec.init = preCompile("__init(" .. compile(pluginPath) .. ")")
         end
         if lazyPlugin.keys then
             spec.keys = {}
@@ -211,9 +211,9 @@ local function compilePlugins(module, transpiledFile)
         .. "    end\n"
         .. "end\n"
 
-    local setupFunc = "local function __setup(module)\n"
+    local initFunc = "local function __init(module)\n"
         .. "    return function(...)\n"
-        .. "        require(module).setup(...)\n"
+        .. "        require(module).init(...)\n"
         .. "    end\n"
         .. "end\n"
 
@@ -228,7 +228,7 @@ local function compilePlugins(module, transpiledFile)
         .. "end\n"
 
     local compiled = (useConfigFunc and configFunc or "")
-        .. (useSetupFunc and setupFunc or "")
+        .. (useInitFunc and initFunc or "")
         .. (useOptsFunc and optsFunc or "")
         .. (useKeymapFunc and keymapFunc or "")
         .. "return " .. compile(specPlugins, 0, 80 - 7)
