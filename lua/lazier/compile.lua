@@ -11,6 +11,10 @@ local function writeFile(path, data)
     assert(uv.fs_close(fd))
 end
 
+local function deleteFile(path)
+    assert(uv.fs_unlink(path))
+end
+
 local function preCompile(s)
     return setmetatable({ code = s }, PreCompiled)
 end
@@ -39,9 +43,7 @@ local RESERVED_WORDS = {
     ["while"] = true
 }
 
--- local function x()
---     yield 5
--- end
+
 
 local function validIdentifier(s)
     if type(s) ~= "string" then
@@ -116,7 +118,7 @@ local function canCompile(o)
     end
 end
 
-local function compilePlugins(module, transpiledFile)
+local function compilePlugins(module, compiledFile, bundlePlugins)
     local lazy = require("lazy")
     local specPlugins = {}
 
@@ -233,7 +235,51 @@ local function compilePlugins(module, transpiledFile)
         .. (useKeymapFunc and keymapFunc or "")
         .. "return " .. compile(specPlugins, 0, 80 - 7)
 
-    writeFile(transpiledFile, compiled)
+    local paths = {
+        vim.fn.stdpath("config") .. "/lua"
+    }
+    if bundlePlugins then
+        vim.print("BUNDLILNG PLUGINS")
+        local prefix = vim.fn.stdpath("data") .. separator .. "lazy"
+        for _, plugin in ipairs(require("lazy").plugins()) do
+            if plugin.dir and vim.startswith(plugin.dir, prefix) then
+                table.insert(paths, plugin.dir .. separator .. "lua")
+            end
+        end
+    end
+
+    local bundled = require("lazier.bundle")({
+        modules = {
+            "vim.func",
+            "vim.func._memoize",
+            "vim.loader",
+            "vim.uri",
+            "vim.F",
+            "vim.fs",
+            "vim.hl",
+            "vim.treesitter.highlighter",
+            "vim.treesitter.query",
+            "vim.treesitter.languagetree",
+            "vim.treesitter.language",
+            "vim.treesitter._range",
+            "vim.treesitter",
+            "vim.filetype",
+            "vim.diagnostic",
+        },
+        paths = paths,
+        custom_modules = {
+            lazierbundle = compiled
+        }
+    })
+
+    writeFile(compiledFile, bundled)
+    local chunk, err = loadfile(compiledFile, "t", {})
+    if chunk then
+        writeFile(compiledFile, string.dump(chunk))
+    else
+        deleteFile(compiledFile)
+        error("failed to compile bytecode: " .. tostring(err))
+    end
 
     return {
         colorRtp = colorRtp
