@@ -116,6 +116,9 @@ end
 vim.opt.runtimepath:prepend(lazierPath)
 ```
 
+## Updating Lazier
+Run `:LazierUpdate` from within Neovim.
+
 ## How it Works
 When your `config` function is called, the Neovim API is wrapped so that
 their calls can be captured. This lets us keep track of which keys should be
