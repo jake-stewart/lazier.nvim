@@ -50,7 +50,7 @@ will not occur until the plugin has loaded:
 ## Faster Startup Time
 You can use use `lazier` inplace of `lazy` to get a quicker startup time.
 There are many optimizations:
- - Delays starting `lazy.nvim` until after Neovim has launched.
+ - Delays starting `lazy.nvim` until after Neovim has rendered its first frame.
  - Compiles your plugin spec into a single file when it changes.
  - Bundles and bytecode compiles part of the Neovim Lua API and
    your config files.
