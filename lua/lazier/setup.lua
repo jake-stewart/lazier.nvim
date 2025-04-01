@@ -183,21 +183,11 @@ return function(module, opts)
             vim.opt.rtp:append(cache.colorRtp)
             vim.cmd.colorscheme(cache.colorscheme)
         end
-
         vim.schedule(function()
             vim.o.loadplugins = loadplugins
             require("lazy").setup(require("lazierbundle"), opts)
             if opts.lazier.after then
                 opts.lazier.after()
-            end
-
-            if vim.g.colors_name ~= cache.colorscheme then
-                local result = require("lazier.compile")(
-                    module, compiledFile, opts.lazier.bundle_plugins)
-                cache.colorscheme = vim.g.colors_name
-                cache.colorRtp = result.colorRtp
-                cache.bundle_plugins = opts.lazier.bundle_plugins
-                writeFile(cacheFile, vim.json.encode(cache))
             end
             if vim.o.ft ~= "" then
                 vim.cmd.setf(vim.o.ft)
@@ -208,15 +198,5 @@ return function(module, opts)
         if opts.lazier.after then
             opts.lazier.after()
         end
-        if vim.g.colors_name ~= cache.colorscheme then
-            local result = require("lazier.compile")(
-                module, compiledFile, opts.lazier.bundle_plugins)
-            cache.colorscheme = vim.g.colors_name
-            cache.colorRtp = result.colorRtp
-            cache.bundle_plugins = opts.lazier.bundle_plugins
-            writeFile(cacheFile, vim.json.encode(cache))
-        end
     end
-
 end
-
