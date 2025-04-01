@@ -239,7 +239,6 @@ local function compilePlugins(module, compiledFile, bundlePlugins)
         vim.fn.stdpath("config") .. "/lua"
     }
     if bundlePlugins then
-        vim.print("BUNDLILNG PLUGINS")
         local prefix = vim.fn.stdpath("data") .. separator .. "lazy"
         for _, plugin in ipairs(require("lazy").plugins()) do
             if plugin.dir and vim.startswith(plugin.dir, prefix) then
