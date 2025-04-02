@@ -1,4 +1,3 @@
---- @diagnostic disable-next-line
 table.unpack = table.unpack or unpack
 
 --- @alias NPacked<T> { [integer]: T, n: integer }

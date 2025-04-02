@@ -2,7 +2,7 @@ local DefaultProxy = {}
 
 local VALUES = setmetatable({}, { __mode = "k" })
 
-local function newDefaultProxy(value)
+local function new_default_proxy(value)
     local proxy = setmetatable({}, DefaultProxy)
     VALUES[proxy] = value
     return proxy
@@ -13,7 +13,7 @@ function DefaultProxy.__index(t, key)
     if proxy_value[key] == nil then
         local value = {}
         proxy_value[key] = value
-        return newDefaultProxy(value)
+        return new_default_proxy(value)
     else
         return proxy_value[key]
     end
@@ -23,4 +23,4 @@ function DefaultProxy.__newindex(t, key, value)
     VALUES[t][key] = value
 end
 
-return newDefaultProxy
+return new_default_proxy

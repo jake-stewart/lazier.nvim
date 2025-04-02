@@ -1,4 +1,4 @@
-local np = require "lazier.npack"
+local np = require "lazier.util.npack"
 
 --- @class RecorderInfo
 --- @field list? any[]
@@ -98,7 +98,7 @@ local M = {}
 
 --- @param recorder any
 --- @param value any
-function M.setValue(recorder, value)
+function M.set_value(recorder, value)
     EVALUATED[recorder] = { value }
 end
 
@@ -106,13 +106,13 @@ end
 --- @return string
 function M.visualize(obj)
     if getmetatable(obj) == Recorder then
-        return M.visualizeProxyInfo(PROXY_INFO[obj])
+        return M.visualize_proxy_info(PROXY_INFO[obj])
     else
-        return M.visualizeObject(obj)
+        return M.visualize_object(obj)
     end
 end
 
-function M.visualizeProxyInfo(item)
+function M.visualize_proxy_info(item)
     if not item.operation then
         return tostring(item.lhs or "value")
     elseif item.operation == "__call" then
@@ -144,19 +144,21 @@ end
 
 --- @param obj any
 --- @return string
-function M.visualizeObject(obj)
+function M.visualize_object(obj)
     if type(obj) == "string" then
         return '"' .. obj:gsub('"', '\\"') .. '"'
     elseif type(obj) == "table" then
         --- @type number | nil
-        local lastSequentialKey = 0
+        local last_sequential_key = 0
         local buffer = {}
         for k, v in pairs(obj) do
-            if lastSequentialKey and k == lastSequentialKey + 1 then
-                lastSequentialKey = k
+            if last_sequential_key
+                and k == last_sequential_key + 1
+            then
+                last_sequential_key = k
                 table.insert(buffer, M.visualize(v))
             else
-                lastSequentialKey = nil
+                last_sequential_key = nil
                 table.insert(
                     buffer,
                     "[" .. M.visualize(k) .. "] = " .. M.visualize(v)
@@ -183,15 +185,15 @@ function M.eval(obj)
     end
     local value
     if getmetatable(obj) == Recorder then
-        value = M.evalProxyInfo(PROXY_INFO[obj])
+        value = M.eval_proxy_info(PROXY_INFO[obj])
     else
-        value = M.evalObject(obj)
+        value = M.eval_object(obj)
     end
     EVALUATED[obj] = { value }
     return value
 end
 
-function M.evalProxyInfo(item)
+function M.eval_proxy_info(item)
     if item.operation == "__call" then
         local args = { n = item.rhs.n }
         for i = 1, item.rhs.n do
@@ -212,7 +214,7 @@ function M.evalProxyInfo(item)
     end
 end
 
-function M.evalObject(obj)
+function M.eval_object(obj)
     if type(obj) == "table" then
         local evaluated = {}
         for k, v in pairs(obj) do
@@ -251,7 +253,7 @@ function M.new(list, name)
     return recorder
 end
 
-function M.countUsage()
+function M.count_usage()
     local count = {
         proxies = 0,
         objects = 0
@@ -266,9 +268,9 @@ function M.countUsage()
 end
 
 function M.debug()
-    local before = M.countUsage()
+    local before = M.count_usage()
     collectgarbage("collect")
-    local after = M.countUsage()
+    local after = M.count_usage()
     print("objects: " .. before.objects
         .. " -> " .. after.objects)
     print("proxies: " .. before.proxies
@@ -277,7 +279,7 @@ end
 
 return {
     new = M.new,
-    setValue = M.setValue,
+    set_value = M.set_value,
     clear = M.clear,
     delete = M.delete,
     eval = M.eval,

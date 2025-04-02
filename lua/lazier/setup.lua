@@ -1,114 +1,82 @@
-local state = require "lazier"
+local constants = require "lazier.constants"
+local state = require "lazier.state"
+local fs = require "lazier.util.fs"
 
---- @type any
-local uv = vim.uv or vim.loop
-
-local function readFile(path)
-    local fd = assert(uv.fs_open(path, "r", 438))
-    local stat = assert(uv.fs_fstat(fd))
-    local data = assert(uv.fs_read(fd, stat.size))
-    assert(uv.fs_close(fd))
-    return data
+local function modified_since(stat, timestamp)
+    return stat.mtime.sec > timestamp
+        or stat.ctime.sec > timestamp
 end
 
-local function writeFile(path, data)
-    local fd = assert(uv.fs_open(path, "w", 438))
-    assert(uv.fs_write(fd, data))
-    assert(uv.fs_close(fd))
-end
-
-local function fileExists(path)
-    return uv.fs_stat(path)
-end
-
-local function mkdir(path)
-    return uv.fs_mkdir(path, 511)
-end
-
-local function checkModifiedFile(file, modifiedSince)
-    local stat = uv.fs_stat(file)
-    if stat.type == "file" then
-        if stat.mtime.sec > modifiedSince
-            or stat.ctime.sec > modifiedSince
-        then
-            return true, 1
-        end
-        return false, 1
-    end
-    return false, 0
-end
-
-local function checkModifiedTree(root, modifiedSince)
-    local handle = assert(uv.fs_scandir(root))
+local function check_modified_tree(root, timestamp)
     local modified = false
     local tally = 0
-
-    while true do
-        local name, type = uv.fs_scandir_next(handle)
-        if not name then
-            return modified, tally
-        end
+    for name, type in fs.scan_directory(root, true) do
         tally = tally + 1
-        local path = root .. "/" .. name
+        local path = fs.join(root, name)
 
-        if type == "file" and name:match("%.lua$") then
-            local stat = assert(uv.fs_stat(path))
-            if stat.mtime.sec > modifiedSince
-                or stat.ctime.sec > modifiedSince
-            then
+        if type == "file" and name:find("%.lua$") then
+            if modified_since(fs.stat(path), timestamp) then
                 modified = true
             end
-        elseif type == "directory" then
-            local childModified, childTally =
-                checkModifiedTree(path, modifiedSince)
-            modified = modified or childModified
-            tally = tally + childTally
+        elseif type == "directory" and not name:find("^%.") then
+            local child_modified, child_tally =
+                check_modified_tree(path, timestamp)
+            modified = modified or child_modified
+            tally = tally + child_tally
         end
     end
+    return modified, tally
 end
 
-local function checkCache(cacheFile, compiledFile)
+local function check_cache(detect_config_changes)
     local recompile = false
-    local lastModified = 0
-    local lastTally = 0
+    local last_modified = 0
+    local last_tally = 0
     local cache
-    local success, contents = pcall(readFile, cacheFile)
-    if not success or not fileExists(compiledFile) then
+    local success, contents = pcall(fs.read_file, constants.cache_path)
+    if not success or not fs.stat(constants.user_compiled_path) then
         recompile = true
     else
-        cache = vim.json.decode(contents)
-        if not cache then
+        success, cache = pcall(vim.json.decode, contents)
+        if not success then
             recompile = true
         else
-            lastModified = cache.modified
-            lastTally = cache.tally
+            last_modified = cache.modified
+            last_tally = cache.tally
         end
         if cache.version ~= vim.v.version then
             recompile = true
         end
     end
 
-    local configDir = vim.fn.stdpath("config")
-    local sourcePath = configDir .. "/lua"
+    local modified, tally
+    if detect_config_changes then
+        local config_dir = vim.fn.stdpath("config")
+        local source_path = fs.join(config_dir, "lua")
 
-    local modified, tally = checkModifiedTree(sourcePath, lastModified)
-    for _, file in ipairs({
-        "lazy-lock.json"
-    }) do
-        local fileModified, fileTally =
-            checkModifiedFile(configDir .. "/" .. file, lastModified)
-        modified = modified or fileModified
-        tally = tally + fileTally
+        modified, tally = check_modified_tree(source_path, last_modified)
+        local extra_files = {
+            fs.join(config_dir, "lazy-lock.json")
+        }
+        for _, file in ipairs(extra_files) do
+            local stat = fs.stat(file)
+            if stat then
+                tally = tally + 1
+                if modified_since(stat, last_modified) then
+                    modified = true
+                end
+            end
+        end
+        recompile = recompile or modified or tally ~= last_tally
     end
 
-    recompile = recompile or modified or tally ~= lastTally
     local timestamp = tonumber(vim.fn.strftime('%s'))
     cache = {
         modified = timestamp,
         colorscheme = cache
             and cache.colorscheme
             or vim.g.colors_name,
-        colorRtp = cache and cache.colorRtp,
+        color_rtp = cache and cache.color_rtp,
         bundle_plugins = cache and cache.bundle_plugins,
         tally = tally,
         version = vim.v.version
@@ -116,62 +84,66 @@ local function checkCache(cacheFile, compiledFile)
     return recompile, cache
 end
 
-local function ensureDirExists(path)
-    if not fileExists(path) then
-        assert(mkdir(path))
-    end
-end
-
-
-return function(module, opts)
+local function setup_lazier(module, opts)
     opts = opts or {}
     opts.lazier = opts.lazier or {}
     opts.lazier.bundle_plugins = opts.lazier.bundle_plugins or false
+    if opts.lazier.detect_changes == nil then
+        opts.lazier.detect_changes = true
+    end
 
     local function start_lazily()
         if type(opts.lazier.start_lazily) == "function" then
             return opts.lazier.start_lazily()
         elseif opts.lazier.start_lazily == nil then
-            local nonLazyLoadableExtensions = {
+            local fname = vim.fn.expand("%")
+            if fname == "" then
+                return true
+            end
+            local non_lazy_loadable_extensions = {
                 zip = true,
                 tar = true,
                 gz = true
             }
-            local fname = vim.fn.expand("%")
-            return fname == ""
-                or vim.fn.isdirectory(fname) == 0
-                and not nonLazyLoadableExtensions[vim.fn.fnamemodify(fname, ":e")]
+            local stat = fs.stat(fname)
+            return not stat
+                or stat.type == "file"
+                and not non_lazy_loadable_extensions
+                    [vim.fn.fnamemodify(fname, ":e")]
         else
             return opts.lazier.start_lazily
         end
     end
 
-    local separator = vim.fn.has('macunix') == 1 and "/" or "\\"
-    local dataDir = table.concat({ vim.fn.stdpath("data"), "lazier" }, separator)
-    ensureDirExists(dataDir)
-    local compiledFile = table.concat({ dataDir, "compiled.lua" }, separator)
-    local cacheFile = table.concat({ dataDir, "cache.json" }, separator)
-    local modified, cache = checkCache(cacheFile, compiledFile)
-    if modified or cache.bundle_plugins ~= opts.lazier.bundle_plugins then
+    if not fs.stat(constants.data_dir) then
+        fs.create_directory(constants.data_dir)
+    end
+
+    local modified, cache = check_cache(opts.lazier.detect_changes)
+
+    if modified
+        or cache.bundle_plugins ~= opts.lazier.bundle_plugins
+    then
         if opts.lazier.before then
             opts.lazier.before()
         end
-        require("lazy").setup(module, opts)
-        local result = require("lazier.compile")(
-            module, compiledFile, opts.lazier.bundle_plugins)
+        local lazy = require("lazy")
+        local compile_user = require("lazier.compile_user")
+        lazy.setup(module, opts)
+        local result = compile_user(module, opts.lazier.bundle_plugins)
         if opts.lazier.after then
             opts.lazier.after()
         end
         cache.colorscheme = vim.g.colors_name
-        cache.colorRtp = result.colorRtp
+        cache.color_rtp = result.color_rtp
         cache.bundle_plugins = opts.lazier.bundle_plugins
-        writeFile(cacheFile, vim.json.encode(cache))
+        fs.write_file(constants.cache_path, vim.json.encode(cache))
         return
     end
 
     state.compiled = true
 
-    loadfile(compiledFile, "b")()
+    loadfile(constants.user_compiled_path, "b")()
     if opts.lazier.before then
         opts.lazier.before()
     end
@@ -179,13 +151,15 @@ return function(module, opts)
     if start_lazily() then
         local loadplugins = vim.o.loadplugins
         vim.o.loadplugins = false
-        if cache.colorRtp then
-            vim.opt.rtp:append(cache.colorRtp)
+        if cache.color_rtp then
+            vim.opt.rtp:append(cache.color_rtp)
             vim.cmd.colorscheme(cache.colorscheme)
         end
         vim.schedule(function()
             vim.o.loadplugins = loadplugins
-            require("lazy").setup(require("lazierbundle"), opts)
+            local lazy = require("lazy")
+            local plugin_spec = require("lazier_plugin_spec")
+            lazy.setup(plugin_spec, opts)
             if opts.lazier.after then
                 opts.lazier.after()
             end
@@ -194,9 +168,13 @@ return function(module, opts)
             end
         end)
     else
-        require("lazy").setup(require("lazierbundle"), opts)
+        local lazy = require("lazy")
+        local plugin_spec = require("lazier_plugin_spec")
+        lazy.setup(plugin_spec, opts)
         if opts.lazier.after then
             opts.lazier.after()
         end
     end
 end
+
+return setup_lazier

@@ -1,32 +1,11 @@
---- @type any
-local uv = vim.uv or vim.loop
+local compiled = table.concat({
+    vim.fn.stdpath("data"), "lazier", "lazier_compiled.lua"
+}, vim.fn.has('macunix') == 1 and "/" or "\\")
 
-vim.api.nvim_create_user_command("LazierUpdate", function()
-    require("lazier.update")()
-end, {})
-
-local separator = vim.fn.has('macunix') == 1 and "/" or "\\"
-local lazierData = vim.fn.stdpath("data") .. separator .. "lazier"
-local lazierBytecode = lazierData .. separator .. "lazierbytecode.lua"
-
-if not uv.fs_stat(lazierBytecode) then
-    require("lazier.bytecode")(lazierBytecode)
-end
-loadfile(lazierBytecode, "b")()
-
-local Lazier = {
-    compiled = false
-}
-
---- @param opts LazyPluginSpec
---- @return LazyPluginSpec
-function Lazier.__call(_, opts)
-    --return opts
-    return require("lazier.wrap")(opts)
+if not (vim.uv or vim.loop).fs_stat(compiled) then
+    require("lazier.compile_lazier")()
 end
 
-function Lazier.setup(module, opts)
-    return require("lazier.setup")(module, opts)
-end
+loadfile(compiled, "b")()
 
-return setmetatable(Lazier, Lazier)
+return require("lazier.main")

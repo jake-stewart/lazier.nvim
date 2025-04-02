@@ -20,8 +20,8 @@ PartialProxy.__le = ignore
 PartialProxy.__len = ignore
 PartialProxy.__concat = ignore
 
-local function newPartialProxy(obj)
+local function new_partial_proxy(obj)
     return setmetatable(obj, PartialProxy)
 end
 
-return newPartialProxy
+return new_partial_proxy

@@ -1,5 +1,3 @@
-table.unpack = table.unpack or unpack
-
 --- @class MimicMetatable
 --- @field _mimic any
 local MimicMetatable = {}
@@ -45,7 +43,7 @@ MimicMetatable.__concat = binary(function(a, b) return a .. b end)
 --- @obj any
 --- @mimic T
 --- @return T
-local function createMimic(obj, mimic)
+local function create_mimic(obj, mimic)
     setmetatable(obj, nil)
     for k in pairs(obj) do
         obj[k] = nil
@@ -55,5 +53,5 @@ local function createMimic(obj, mimic)
 end
 
 return {
-    new = createMimic
+    new = create_mimic
 };
