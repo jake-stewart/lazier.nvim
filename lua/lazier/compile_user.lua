@@ -48,6 +48,7 @@ local function compile_user(module, bundle_plugins)
         local spec = {}
         spec[1] = plugin[1]
         spec.dir = plugin.dir
+        spec.priority = plugin.priority
         spec.event = plugin.event
         spec.branch = plugin.branch
         spec.dependencies = plugin.dependencies
