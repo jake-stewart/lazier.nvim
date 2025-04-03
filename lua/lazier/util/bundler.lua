@@ -76,9 +76,9 @@ function M.bundle(opts)
             end
         end
         if not module_path then
-            error("could not find " .. module[1])
-        end
-        if module.recursive then
+            -- can't hurt to ignore this
+            -- since missing modules will requried normally
+        elseif module.recursive then
             iter_module(module[1], module_path, modules)
         end
     end
