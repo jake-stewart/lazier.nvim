@@ -24,12 +24,12 @@ local RESERVED_WORDS = {
     ["while"] = true
 }
 
-local Fragment = {}
-
 local M = {}
 
+M.Fragment = {}
+
 function M.fragment(s)
-    return setmetatable({ tostring(s) }, Fragment)
+    return setmetatable({ tostring(s) }, M.Fragment)
 end
 
 function M.function_call(name, ...)
@@ -59,7 +59,7 @@ function M.serialize(o, depth, max_line_length)
         return '"' .. o:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"'
     elseif type(o) == "number" or type(o) == "boolean" or o == nil then
         return tostring(o)
-    elseif getmetatable(o) == Fragment then
+    elseif getmetatable(o) == M.Fragment then
         return o[1]
     elseif type(o) == "table" then
         local buffer = {}
@@ -114,7 +114,7 @@ function M.can_serialize(o)
         return true
     elseif type(o) == "table" then
         local metatable = getmetatable(o)
-        if metatable == Fragment then
+        if metatable == M.Fragment then
             return true
         elseif metatable then
             return false

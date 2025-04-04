@@ -5,6 +5,29 @@ local compiler = require "lazier.util.compiler"
 local constants = require "lazier.constants"
 local lazy = require "lazy"
 
+table.unpack = table.unpack or unpack
+
+local function fragment_functions(parent, obj, path, i)
+    for k, v in pairs(obj) do
+        path[i] = k
+        if type(v) == "function" then
+            local code = "function(...) return " .. parent
+            for j = 1, i do
+                if serializer.valid_identifier(path[j]) then
+                    code = code .. "." .. path[j]
+                else
+                    code = code .. "[" .. serializer.serialize(path[j]) .. "]"
+                end
+            end
+            code = code .. "(...) end"
+            obj[k] = serializer.fragment(code)
+        elseif type(v) == "table" then
+            fragment_functions(parent, v, path, i + 1)
+        end
+        path[i] = nil
+    end
+end
+
 local function compile_user(module, bundle_plugins)
     local spec_plugins = {}
 
@@ -12,11 +35,6 @@ local function compile_user(module, bundle_plugins)
     local color_rtp
 
     local lazy_plugins = lazy.plugins()
-
-    local use_config_func = false
-    local use_init_func = false
-    local use_opts_func = false
-    local use_keymap_func = false
 
     local lazy_util = require("lazy.core.util")
     lazy_util.lsmod(module, function(plugin_path)
@@ -45,98 +63,25 @@ local function compile_user(module, bundle_plugins)
                 end
             end
         end
-        local spec = {}
-        spec[1] = plugin[1]
-        spec.dir = plugin.dir
-        spec.priority = plugin.priority
-        spec.event = plugin.event
-        spec.branch = plugin.branch
-        spec.dependencies = plugin.dependencies
-        spec.lazy = plugin.lazy
-        spec.ft = plugin.ft
-        spec.opts = plugin.opts
-        if plugin.opts then
-            if serializer.can_serialize(plugin.opts) then
-                spec.opts = plugin.opts
-            else
-                use_opts_func = true
-                spec.opts = serializer.function_call("__opts", plugin_path)
+        local spec = vim.deepcopy(plugin)
+        local parent = serializer.function_call("require", plugin_path)
+        fragment_functions(parent[1], spec, {}, 1)
+        for _, v in pairs(spec) do
+            if type(v) == "table"
+                and getmetatable(v) ~= serializer.Fragment
+            then
+                setmetatable(v, nil)
             end
         end
-        if plugin.config then
-            use_config_func = true
-            spec.config = serializer.function_call("__config", plugin_path)
+        if serializer.can_serialize(spec) then
+            table.insert(spec_plugins, spec)
+        else
+            table.insert(spec_plugins, parent)
         end
-        if plugin.init then
-            use_init_func = true
-            spec.init = serializer.function_call("__init", plugin_path)
-        end
-        if lazy_plugin.keys then
-            spec.keys = {}
-            for i, key in ipairs(lazy_plugin.keys) do
-                if type(key) == "string" then
-                    table.insert(spec.keys, key)
-                else
-                    local rhs = nil
-                    if type(key[2]) == "string" then
-                        rhs = key[2]
-                    elseif type(key[2]) == "function" then
-                        use_keymap_func = true
-                        rhs = serializer.function_call("__keymap", plugin_path, i)
-                    end
-                    if key.mode and key.mode ~= "n"
-                        or rhs
-                        or key.desc
-                        or key.noremap
-                        or key.remap
-                        or key.expr
-                        or key.nowait
-                    then
-                        table.insert(spec.keys, {
-                            key[1],
-                            rhs,
-                            mode = key.mode,
-                            desc = key.desc,
-                            noremap = key.noremap,
-                            remap = key.remap,
-                            expr = key.expr,
-                        })
-                    else
-                        table.insert(spec.keys, key[1])
-                    end
-                end
-            end
-        end
-        table.insert(spec_plugins, spec)
     end)
 
-    local config_func = "local function __config(module)\n"
-        .. "    return function(...)\n"
-        .. "        require(module).config(...)\n"
-        .. "    end\n"
-        .. "end\n"
-
-    local init_func = "local function __init(module)\n"
-        .. "    return function(...)\n"
-        .. "        require(module).init(...)\n"
-        .. "    end\n"
-        .. "end\n"
-
-    local opts_func = "local function __opts(module)\n"
-        .. "    return require(module).opts\n"
-        .. "end\n"
-
-    local keymap_func = "local function __keymap(module, idx)\n"
-        .. "    return function(...)\n"
-        .. "        require(module).keys[idx][2](...)\n"
-        .. "    end\n"
-        .. "end\n"
-
-    local compiled_plugin_spec = (use_config_func and config_func or "")
-        .. (use_init_func and init_func or "")
-        .. (use_opts_func and opts_func or "")
-        .. (use_keymap_func and keymap_func or "")
-        .. "return " .. serializer.serialize(spec_plugins, 0, 80 - 7)
+    local compiled_plugin_spec =
+        "return " .. serializer.serialize(spec_plugins, 0, 80 - 7)
 
     local paths = {
         vim.fn.stdpath("config") .. "/lua"
