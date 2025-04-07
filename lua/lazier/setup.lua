@@ -127,10 +127,8 @@ local function setup_lazier(module, opts)
         if opts.lazier.before then
             opts.lazier.before()
         end
-        local lazy = require("lazy")
         local compile_user = require("lazier.compile_user")
-        lazy.setup(module, opts)
-        local result = compile_user(module, opts.lazier.bundle_plugins)
+        local result = compile_user(module, opts, opts.lazier.bundle_plugins)
         if opts.lazier.after then
             opts.lazier.after()
         end

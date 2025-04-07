@@ -1,11 +1,12 @@
 require "lazier.commands"
+local state = require "lazier.state"
 
 local Lazier = {}
 
 --- @param opts LazyPluginSpec
 --- @return LazyPluginSpec
 function Lazier.__call(_, opts)
-    if Lazier.compiled then
+    if state.compiled then
         return opts
     end
     local wrap = require("lazier.wrap")
