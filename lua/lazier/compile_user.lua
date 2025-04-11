@@ -60,7 +60,9 @@ local function compile_user(module, opts, bundle_plugins)
         for _, candidate in ipairs(lazy_plugins) do
             if candidate[1] and candidate[1] == plugin[1]
                 or candidate.url and candidate.url == plugin.url
-                or candidate.dir and candidate.dir == plugin.dir
+                or candidate.dir and plugin.dir
+                    and vim.fs.abspath(candidate.dir)
+                        == vim.fs.abspath(plugin.dir)
             then
                 lazy_plugin = candidate
                 break
