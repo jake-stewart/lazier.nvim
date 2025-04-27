@@ -124,6 +124,7 @@ local function setup_lazier(module, opts)
     if modified
         or cache.bundle_plugins ~= opts.lazier.bundle_plugins
     then
+        vim.loader.enable()
         if opts.lazier.before then
             opts.lazier.before()
         end
@@ -141,7 +142,9 @@ local function setup_lazier(module, opts)
 
     state.compiled = true
 
+    vim.loader.enable(false)
     loadfile(constants.user_compiled_path, "b")()
+    vim.loader.enable()
     if opts.lazier.before then
         opts.lazier.before()
     end
