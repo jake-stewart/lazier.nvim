@@ -87,6 +87,16 @@ end
 local function setup_lazier(module, opts)
     opts = opts or {}
     opts.lazier = opts.lazier or {}
+    if opts.lazier.enabled == false then
+        if opts.lazier.before then
+            opts.lazier.before()
+        end
+        require("lazy").setup(module, opts)
+        if opts.lazier.after then
+            opts.lazier.after()
+        end
+        return
+    end
     opts.lazier.bundle_plugins = opts.lazier.bundle_plugins or false
     if opts.lazier.detect_changes == nil then
         opts.lazier.detect_changes = true
