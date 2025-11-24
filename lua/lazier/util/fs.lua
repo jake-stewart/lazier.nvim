@@ -31,7 +31,7 @@ function M.create_directory(path)
     assert(uv.fs_mkdir(path, 511))
 end
 
-local separator = vim.fn.has('macunix') == 1 and "/" or "\\"
+local separator = vim.fn.has('win32') == 1 and "\\" or "/"
 
 function M.join(...)
     return table.concat(vim.tbl_map(function(item)
