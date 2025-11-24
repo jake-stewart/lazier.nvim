@@ -32,14 +32,33 @@ function M.fragment(s)
     return setmetatable({ tostring(s) }, M.Fragment)
 end
 
-function M.function_call(name, ...)
+function M.index(obj, ...)
+    if type(obj) ~= "string" then
+        obj = M.serialize(obj)
+    end
+    local path = np.pack(...)
+    local serialized_path = {}
+    for i = 1, path.n do
+        if M.valid_identifier(path[i]) then
+            serialized_path[i] = "." .. path[i]
+        else
+            serialized_path[i] = "[" .. M.serialize(path[i]) .. "]";
+        end
+    end
+    return M.fragment(obj .. table.concat(serialized_path, ""))
+end
+
+function M.function_call(func, ...)
+    if type(func) ~= "string" then
+        func = M.serialize(func)
+    end
     local args = np.pack(...)
     local serialized_args = {}
     for i = 1, args.n do
         serialized_args[i] = M.serialize(args[i])
     end
     return M.fragment(
-        name .. "(" .. table.concat(serialized_args, ", ") .. ")"
+        func .. "(" .. table.concat(serialized_args, ", ") .. ")"
     )
 end
 

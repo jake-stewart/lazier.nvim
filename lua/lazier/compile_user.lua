@@ -54,46 +54,61 @@ local function compile_user(module, opts, bundle_plugins)
     local colors_name = vim.g.colors_name
     local color_rtp
     local lazy_plugins = lazy.plugins()
-    for plugin_path, plugin in pairs(plugin_modules) do
-        package.loaded[plugin_path] = plugin
-        local lazy_plugin
-        for _, candidate in ipairs(lazy_plugins) do
-            if candidate[1] and candidate[1] == plugin[1]
-                or candidate.url and candidate.url == plugin.url
-                or candidate.dir and plugin.dir
-                    and vim.fs.abspath(candidate.dir)
-                        == vim.fs.abspath(plugin.dir)
-            then
-                lazy_plugin = candidate
-                break
-            end
+    for plugins_path, plugins in pairs(plugin_modules) do
+        local listSchema = true;
+        if
+            type(plugins[1]) == "string"
+            or type(plugins.url) == "string"
+            or type(plugins.dir) == "string"
+        then
+            listSchema = false
+            plugins = { plugins }
         end
-        if lazy_plugin ~= nil then
-            if colors_name and not color_rtp then
-                local extensions = { "vim", "lua" }
-                for _, extension in ipairs(extensions) do
-                    local path = fs.join(
-                        lazy_plugin.dir, "colors", colors_name .. "." .. extension)
-                    if fs.stat(path) then
-                        color_rtp = lazy_plugin.dir
-                        break
+
+        package.loaded[plugins_path] = plugins
+        for plugin_idx, plugin in ipairs(plugins) do
+            local lazy_plugin
+            for _, candidate in ipairs(lazy_plugins) do
+                if candidate[1] and candidate[1] == plugin[1]
+                    or candidate.url and candidate.url == plugin.url
+                    or candidate.dir and plugin.dir
+                        and vim.fs.abspath(candidate.dir)
+                            == vim.fs.abspath(plugin.dir)
+                then
+                    lazy_plugin = candidate
+                    break
+                end
+            end
+            if lazy_plugin ~= nil then
+                if colors_name and not color_rtp then
+                    local extensions = { "vim", "lua" }
+                    for _, extension in ipairs(extensions) do
+                        local path = fs.join(
+                            lazy_plugin.dir, "colors", colors_name .. "." .. extension)
+                        if fs.stat(path) then
+                            color_rtp = lazy_plugin.dir
+                            break
+                        end
                     end
                 end
-            end
-            local spec = vim.deepcopy(plugin)
-            local parent = serializer.function_call("require", plugin_path)
-            fragment_functions(parent[1], spec, {}, 1)
-            for _, v in pairs(spec) do
-                if type(v) == "table"
-                    and getmetatable(v) ~= serializer.Fragment
-                then
-                    setmetatable(v, nil)
+                local spec = vim.deepcopy(plugin)
+                local parent = serializer.function_call("require", plugins_path);
+                if listSchema then
+                    parent = serializer.index(parent, plugin_idx)
                 end
-            end
-            if serializer.can_serialize(spec) then
-                table.insert(spec_plugins, spec)
-            else
-                table.insert(spec_plugins, parent)
+                fragment_functions(serializer.serialize(parent), spec, {}, 1)
+                for _, v in pairs(spec) do
+                    if type(v) == "table"
+                        and getmetatable(v) ~= serializer.Fragment
+                    then
+                        setmetatable(v, nil)
+                    end
+                end
+                if serializer.can_serialize(spec) then
+                    table.insert(spec_plugins, spec)
+                else
+                    table.insert(spec_plugins, parent)
+                end
             end
         end
     end
