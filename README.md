@@ -67,6 +67,10 @@ require("lazier").setup("plugins", {
         -- whether plugins should be included in the bytecode
         -- compiled bundle. this will make your startup slower.
         bundle_plugins = false
+
+        -- whether to automatically generate lazy loading config
+        -- by identifying the mappings set when the plugin loads
+        generate_lazy_mappings = true
     },
 
     -- your usual lazy.nvim config goes here

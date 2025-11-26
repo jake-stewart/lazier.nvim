@@ -158,7 +158,12 @@ local function setup_lazier(module, opts)
             opts.lazier.before()
         end
         local compile_user = require("lazier.compile_user")
-        local result = compile_user(module, opts, opts.lazier.bundle_plugins)
+        local result = compile_user(
+            module,
+            opts,
+            opts.lazier.bundle_plugins,
+            opts.lazier.generate_lazy_mappings
+        )
         if opts.lazier.after then
             opts.lazier.after()
         end

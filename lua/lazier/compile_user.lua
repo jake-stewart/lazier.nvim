@@ -28,13 +28,15 @@ local function fragment_functions(parent, obj, path, i)
     end
 end
 
-local function compile_user(module, opts, bundle_plugins)
-    local Spec = require("lazy.core.plugin").Spec
-    local parse = Spec.parse
-    function Spec:parse(spec)
-        parse(self, spec)
-        for _, plugin in pairs(self.plugins) do
-            wrap(plugin)
+local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings)
+    if generate_lazy_mappings ~= false then
+        local Spec = require("lazy.core.plugin").Spec
+        local parse = Spec.parse
+        function Spec:parse(spec)
+            parse(self, spec)
+            for _, plugin in pairs(self.plugins) do
+                wrap(plugin)
+            end
         end
     end
 
