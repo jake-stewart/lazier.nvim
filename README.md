@@ -22,7 +22,7 @@ without any extra effort.
 ## Setup
 
 ```lua
-local lazierPath = vim.fn.stdpath("data") .. "/lazier.nvim"
+local lazierPath = vim.fn.stdpath("data") .. "/lazier/lazier.nvim"
 if not (vim.uv or vim.loop).fs_stat(lazierPath) then
     local repo = "https://github.com/jake-stewart/lazier.nvim.git"
     local out = vim.fn.system({
