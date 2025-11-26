@@ -15,16 +15,21 @@ return function(spec)
     end
 
     for _, plugin in ipairs(plugins --[[ @as LazyPluginSpec[] ]]) do
-        if plugin.enabled == false
-            or plugin.lazy == false
-            or type(plugin.config) ~= "function"
-        then
+        if plugin.enabled == false or plugin.lazy == false then
         else
-            local pluginConfig = plugin.config;
-            if type(pluginConfig) == "function" then
+            local pluginConfig = plugin.config
+            local pluginOpts = plugin.opts
+            if (type(pluginConfig) == "function") ~= (pluginOpts ~= nil) then
                 local isPluginLazy = plugin.lazy
                 plugin.lazy = false
-                plugin.config = function()
+                plugin.config = function(lazyPlugin, lazyPluginOpts)
+                    if pluginConfig == nil then
+                        pluginConfig = function()
+                            local loader = require("lazy.core.loader")
+                            local main = loader.get_main(lazyPlugin)
+                            require(main).setup(lazyPluginOpts)
+                        end
+                    end
                     plugin.lazy = isPluginLazy
                     local wrappers = {
                         keymaps = { obj = vim.keymap, name = "set" },
@@ -68,28 +73,6 @@ return function(spec)
                             })
                         end
                     end
-
-                    -- if #wrappers.autocmds.calls > 0 then
-                    --     if type(plugin.event) == "table" then
-                    --     elseif type(plugin.event) == "string" then
-                    --         plugin.event = { plugin.event --[[ @as any ]] }
-                    --     else
-                    --         plugin.event = {}
-                    --     end
-                    --     if type(plugin.event) ~= "table" then
-                    --         error("expected table for 'event'")
-                    --     end
-                    --     for _, args in ipairs(wrappers.autocmds.calls) do
-                    --         if type(args[1]) == "string" then
-                    --             table.insert(plugin.event --[[ @as any ]], args[1])
-                    --         else
-                    --             for _, event in ipairs(args[1]) do
-                    --                 table.insert(plugin.event --[[ @as any ]], event)
-                    --             end
-                    --         end
-                    --     end
-                    -- end
-
                 end
             end
         end

@@ -193,7 +193,9 @@ local function setup_lazier(module, opts)
             if opts.lazier.after then
                 opts.lazier.after()
             end
-            if vim.o.ft ~= "" then
+            if vim.fn.expand("%") ~= "" then
+                pcall(vim.cmd.edit)
+            elseif vim.o.ft ~= "" then
                 vim.cmd.setf(vim.o.ft)
             end
         end)
