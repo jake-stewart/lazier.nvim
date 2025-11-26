@@ -3,7 +3,7 @@ local compiled = table.concat({
 }, vim.fn.has('win32') == 1 and "\\" or "/")
 
 if not (vim.uv or vim.loop).fs_stat(compiled) then
-    require("lazier.compile_lazier")()
+    require("lazier.compile_lazier")
 end
 
 loadfile(compiled, "b")()

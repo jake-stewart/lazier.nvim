@@ -3,6 +3,7 @@ local bundler = require "lazier.util.bundler"
 local serializer = require "lazier.util.serializer"
 local compiler = require "lazier.util.compiler"
 local constants = require "lazier.constants"
+local wrap = require "lazier.wrap"
 
 table.unpack = table.unpack or unpack
 
@@ -28,6 +29,15 @@ local function fragment_functions(parent, obj, path, i)
 end
 
 local function compile_user(module, opts, bundle_plugins)
+    local Spec = require("lazy.core.plugin").Spec
+    local parse = Spec.parse
+    function Spec:parse(spec)
+        parse(self, spec)
+        for _, plugin in pairs(self.plugins) do
+            wrap(plugin)
+        end
+    end
+
     local lazy_util = require("lazy.core.util")
     local plugin_modules = {}
     local plugin_paths = {}
@@ -46,6 +56,7 @@ local function compile_user(module, opts, bundle_plugins)
             return loadfile(path)
         end
     end
+
     local lazy = require("lazy")
     lazy.setup(module, opts)
     _G.loadfile = loadfile
@@ -92,6 +103,8 @@ local function compile_user(module, opts, bundle_plugins)
                     end
                 end
                 local spec = vim.deepcopy(plugin)
+                spec.keys = lazy_plugin.keys
+                spec.event = lazy_plugin.event
                 local parent = serializer.function_call("require", plugins_path);
                 if listSchema then
                     parent = serializer.index(parent, plugin_idx)

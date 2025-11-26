@@ -28,9 +28,7 @@ return function(spec)
                     plugin.lazy = isPluginLazy
                     local wrappers = {
                         keymaps = { obj = vim.keymap, name = "set" },
-                        highlights = { obj = vim.api, name = "nvim_set_hl" },
-                        augroups = { obj = vim.api, name = "nvim_create_augroup" },
-                        autocmds = { obj = vim.api, name = "nvim_create_autocmd" },
+                        -- autocmds = { obj = vim.api, name = "nvim_create_autocmd" },
                     }
                     for _, wrapper in pairs(wrappers) do
                         wrapper.original = wrapper.obj[wrapper.name]
@@ -59,17 +57,38 @@ return function(spec)
                         if type(plugin.keys) ~= "table" then
                             error("expected table for 'keys'")
                         end
-                        for _, keymap in ipairs(wrappers.keymaps.calls) do
-                            local desc = type(keymap[4]) == "table"
-                                and keymap[4].desc
+                        for _, args in ipairs(wrappers.keymaps.calls) do
+                            local desc = type(args[4]) == "table"
+                                and args[4].desc
                                 or nil
                             table.insert(plugin.keys --[[ @as any ]], {
-                                keymap[2],
-                                mode = keymap[1],
+                                args[2],
+                                mode = args[1],
                                 desc = desc
                             })
                         end
                     end
+
+                    -- if #wrappers.autocmds.calls > 0 then
+                    --     if type(plugin.event) == "table" then
+                    --     elseif type(plugin.event) == "string" then
+                    --         plugin.event = { plugin.event --[[ @as any ]] }
+                    --     else
+                    --         plugin.event = {}
+                    --     end
+                    --     if type(plugin.event) ~= "table" then
+                    --         error("expected table for 'event'")
+                    --     end
+                    --     for _, args in ipairs(wrappers.autocmds.calls) do
+                    --         if type(args[1]) == "string" then
+                    --             table.insert(plugin.event --[[ @as any ]], args[1])
+                    --         else
+                    --             for _, event in ipairs(args[1]) do
+                    --                 table.insert(plugin.event --[[ @as any ]], event)
+                    --             end
+                    --         end
+                    --     end
+                    -- end
 
                 end
             end

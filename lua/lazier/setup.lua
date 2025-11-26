@@ -86,6 +86,25 @@ end
 
 local function setup_lazier(module, opts)
     opts = opts or {}
+
+    if not vim.o.rtp:find("/lazy/lazy.nvim") then
+        local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+        if not (vim.uv or vim.loop).fs_stat(lazypath) then
+          local lazyrepo = "https://github.com/folke/lazy.nvim.git"
+          local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath })
+          if vim.v.shell_error ~= 0 then
+            vim.api.nvim_echo({
+              { "Failed to clone lazy.nvim:\n", "ErrorMsg" },
+              { out, "WarningMsg" },
+              { "\nPress any key to exit..." },
+            }, true, {})
+            vim.fn.getchar()
+            os.exit(1)
+          end
+        end
+        vim.opt.rtp:prepend(lazypath)
+    end
+
     opts.lazier = opts.lazier or {}
     if opts.lazier.enabled == false then
         if opts.lazier.before then
