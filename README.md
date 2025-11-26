@@ -1,61 +1,40 @@
 # lazier.nvim
 Lazier is a wrapper around [lazy.nvim](https://lazy.folke.io/) and lets you
-have lazy loaded plugins without any extra effort.
+have extremely fast startup time and lazy loaded plugins
+without any extra effort.
 
-### Before:
-Normally, we define mappings within the `keys` field so that the plugin can
-be lazy loaded:
-
-```lua
-return {
-    "repo/some-plugin.nvim",
-    opts = {},
-    keys = {
-        "<leader>a", function()
-            require("some-plugin").doSomething()
-        end,
-        "<leader>b", function()
-            vim.cmd.DoSomethingElse()
-        end
-    }
-}
-```
-
-### After
-With lazier, we define mappings and configuration with normal code and get
-lazy loading automatically: 
-
-```lua
-return require "lazier" {
-    "repo/some-plugin.nvim",
-    config = function()
-        local plugin = require("some-plugin")
-        plugin.setup({})
-        vim.keymap.set("n", "<leader>a", plugin.doSomething)
-        vim.keymap.set("n", "<leader>b", vim.cmd.DoSomethingElse)
-    end
-}
-```
-
-### What's Supported
-The following functions and objects are supported. Any operations using them
-will not occur until the plugin has loaded:
-- `vim.keymap.set`
-- `vim.api.nvim_set_hl`
-- `vim.cmd`
-- `vim.api.nvim_create_autocmd`
-- `vim.api.nvim_create_augroup`
-- Any module that is imported with `require`
-
-## Faster Startup Time
-You can use use `lazier` inplace of `lazy` to get a quicker startup time.
-There are many optimizations:
+Start up time optimizations:
  - Delays starting `lazy.nvim` until after Neovim has rendered its first frame.
  - Compiles your plugin spec into a single file when it changes.
  - Bundles and bytecode compiles part of the Neovim Lua API and
    your config files.
 
+Automatic lazy loaded plugins:
+ - The first time you open Neovim after your config changes, lazy loading is disabled.
+   Parts of the Neovim API like `vim.keymap.set` are wrapped and used to automatically build up
+   a lazy loading spec.
+ - Subsequent Neovim launches will use the previously generated, bundled and bytecode compiled
+   lazy loading specs to avoid run-time cost.
+
+Backwards compatible with Lazy.
+ - You can add lazier and get the improved start up time without having to change your config.
+
+## Setup
+
 ```lua
+local lazierPath = vim.fn.stdpath("data") .. "/lazier.nvim"
+if not (vim.uv or vim.loop).fs_stat(lazierPath) then
+    local repo = "https://github.com/jake-stewart/lazier.nvim.git"
+    local out = vim.fn.system({
+        "git", "clone", "--branch=stable-v2", repo, lazierPath })
+    if vim.v.shell_error ~= 0 then
+        vim.api.nvim_echo({{
+            "Failed to clone lazier.nvim:\n" .. out, "Error"
+        }}, true, {})
+    end
+end
+vim.opt.runtimepath:prepend(lazierPath)
+
 require("lazier").setup("plugins", {
     lazier = {
         before = function()
@@ -95,34 +74,43 @@ require("lazier").setup("plugins", {
 })
 ```
 
+## Example Plugin Config
 
-## Install Instructions (macOS/Linux)
-Make sure lazy.nvim is installed by following
-[their instructions](https://lazy.folke.io/installation).
-Then, add this code to your `init.lua`:
+#### Before
+Normally, we define mappings within the `keys` field so that the plugin can
+be lazy loaded:
 
 ```lua
-local lazierPath = vim.fn.stdpath("data") .. "/lazier.nvim"
-if not (vim.uv or vim.loop).fs_stat(lazierPath) then
-    local repo = "https://github.com/jake-stewart/lazier.nvim.git"
-    local out = vim.fn.system({
-        "git", "clone", "--branch=stable", repo, lazierPath })
-    if vim.v.shell_error ~= 0 then
-        vim.api.nvim_echo({{
-            "Failed to clone lazier.nvim:\n" .. out, "Error"
-        }}, true, {})
-    end
-end
-vim.opt.runtimepath:prepend(lazierPath)
+return {
+    "repo/some-plugin.nvim",
+    opts = {},
+    keys = {
+        "<leader>a", function()
+            require("some-plugin").doSomething()
+        end,
+        "<leader>b", function()
+            vim.cmd.DoSomethingElse()
+        end
+    }
+}
 ```
+
+#### After
+With lazier, we define mappings and configuration with normal code and get
+lazy loading automatically: 
+
+```lua
+return {
+    "repo/some-plugin.nvim",
+    config = function()
+        local plugin = require("some-plugin")
+        plugin.setup({})
+        vim.keymap.set("n", "<leader>a", plugin.doSomething)
+        vim.keymap.set("n", "<leader>b", vim.cmd.DoSomethingElse)
+    end
+}
+```
+
 
 ## Updating Lazier
 Run `:LazierUpdate` from within Neovim.
-
-## How it Works
-When your `config` function is called, the Neovim API is wrapped so that
-their calls can be captured. This lets us keep track of which keys should be
-used for lazy loading. Requiring a module returns a proxy object that keeps
-track the operations that occur. These operations are only applied once the
-plugin is loaded. This lets you configure and use a plugin as though it were
-loaded with your operations only taking once it actually loads.
