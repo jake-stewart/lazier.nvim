@@ -3,20 +3,20 @@ Lazier is a wrapper around [lazy.nvim](https://lazy.folke.io/) and lets you
 have extremely fast startup time and lazy loaded plugins
 without any extra effort.
 
-Start up time optimizations:
+**Start up time optimizations:**
  - Delays starting `lazy.nvim` until after Neovim has rendered its first frame.
  - Compiles your plugin spec into a single file when it changes.
  - Bundles and bytecode compiles part of the Neovim Lua API and
    your config files.
 
-Automatic lazy loaded plugins:
+**Automatic lazy loaded plugins:**
  - The first time you open Neovim after your config changes, lazy loading is disabled.
    Parts of the Neovim API like `vim.keymap.set` are wrapped and used to automatically build up
    a lazy loading spec.
  - Subsequent Neovim launches will use the previously generated, bundled and bytecode compiled
    lazy loading specs to avoid run-time cost.
 
-Backwards compatible with Lazy.
+**Backwards compatible with Lazy.**
  - You can add lazier and get the improved start up time without having to change your config.
 
 ## Setup
