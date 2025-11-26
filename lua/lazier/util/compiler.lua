@@ -4,7 +4,10 @@ local M = {}
 
 function M.try_compile(code, bundled_file, compiled_file)
     local _, err = pcall(function()
-        fs.create_directory(vim.fn.fnamemodify(bundled_file, ":h"))
+        local parent = vim.fn.fnamemodify(bundled_file, ":h")
+        if not fs.stat(parent) then
+            fs.create_directory(vim.fn.fnamemodify(bundled_file, ":h"))
+        end
         fs.write_file(bundled_file, code)
         local chunk, err = loadfile(bundled_file, "t", {})
         if not chunk then
