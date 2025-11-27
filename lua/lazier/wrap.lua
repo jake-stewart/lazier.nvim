@@ -27,7 +27,9 @@ return function(spec)
                         pluginConfig = function()
                             local loader = require("lazy.core.loader")
                             local main = loader.get_main(lazyPlugin)
-                            require(main).setup(lazyPluginOpts)
+                            if main then
+                                require(main).setup(lazyPluginOpts)
+                            end
                         end
                     end
                     plugin.lazy = isPluginLazy

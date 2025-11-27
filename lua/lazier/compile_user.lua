@@ -73,25 +73,28 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
             type(plugins[1]) == "string"
             or type(plugins.url) == "string"
             or type(plugins.dir) == "string"
+            or type(plugins.import) == "string"
         then
             listSchema = false
             plugins = { plugins }
         end
-
         package.loaded[plugins_path] = plugins
         for plugin_idx, plugin in ipairs(plugins) do
+            if plugin.import then
+                plugin = require(plugin.import)
+            end
             local lazy_plugin
             for _, candidate in ipairs(lazy_plugins) do
-                if candidate[1] and candidate[1] == plugin[1]
-                    or candidate.url and candidate.url == plugin.url
+                if getmetatable(candidate).__index == plugin
                     or candidate.dir and plugin.dir
-                        and vim.fs.abspath(candidate.dir)
-                            == vim.fs.abspath(plugin.dir)
+                    and vim.fs.abspath(candidate.dir)
+                        == vim.fs.abspath(plugin.dir)
                 then
                     lazy_plugin = candidate
                     break
                 end
             end
+
             if lazy_plugin ~= nil then
                 if colors_name and not color_rtp then
                     local extensions = { "vim", "lua" }
