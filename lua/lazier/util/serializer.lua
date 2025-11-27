@@ -48,6 +48,13 @@ function M.index(obj, ...)
     return M.fragment(obj .. table.concat(serialized_path, ""))
 end
 
+function M.assignment(lhs, rhs)
+    if type(lhs) ~= "string" then
+        lhs = M.serialize(lhs)
+    end
+    return M.fragment(lhs .. " = " .. M.serialize(rhs))
+end
+
 function M.function_call(func, ...)
     if type(func) ~= "string" then
         func = M.serialize(func)
@@ -75,7 +82,7 @@ end
 function M.serialize(o, depth, max_line_length)
     max_line_length = max_line_length or 80
     if type(o) == "string" then
-        return '"' .. o:gsub("\\", "\\\\"):gsub('"', '\\"') .. '"'
+        return '"' .. o:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n") .. '"'
     elseif type(o) == "number" or type(o) == "boolean" or o == nil then
         return tostring(o)
     elseif getmetatable(o) == M.Fragment then
