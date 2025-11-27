@@ -109,7 +109,7 @@ return {
 
 #### After
 With lazier, we define mappings and configuration with normal code and get
-lazy loading automatically: 
+lazy loading automatically (This new way of configuring is optional. Your old configs are backwards compatible): 
 
 ```lua
 return {
