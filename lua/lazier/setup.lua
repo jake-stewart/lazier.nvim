@@ -78,6 +78,7 @@ local function check_cache(detect_config_changes)
             or vim.g.colors_name,
         color_rtp = cache and cache.color_rtp,
         bundle_plugins = cache and cache.bundle_plugins,
+        non_lazy_plugins = cache and cache.non_lazy_plugins,
         tally = tally,
         version = vim.v.version
     }
@@ -169,6 +170,7 @@ local function setup_lazier(module, opts)
         end
         cache.colorscheme = vim.g.colors_name
         cache.color_rtp = result.color_rtp
+        cache.non_lazy_plugins = result.non_lazy_plugins
         cache.bundle_plugins = opts.lazier.bundle_plugins
         fs.write_file(constants.cache_path, vim.json.encode(cache))
         return
@@ -190,11 +192,46 @@ local function setup_lazier(module, opts)
             vim.opt.rtp:append(cache.color_rtp)
             vim.cmd.colorscheme(cache.colorscheme)
         end
+        if cache.non_lazy_plugins then
+            for _, plugin in ipairs(cache.non_lazy_plugins) do
+                vim.opt.rtp:append(plugin.rtp)
+            end
+            for _, plugin in ipairs(cache.non_lazy_plugins) do
+                if not plugin.dep then
+                    local schema = require(plugin.path)
+                    if plugin.idx then
+                        schema = schema[plugin.idx]
+                    end
+                    if schema.opts and not schema.config and plugin.main then
+                        local m = require(plugin.main)
+                        if m.setup then
+                            m.setup(schema.opts)
+                        end
+                    elseif schema.config then
+                        schema.config(schema.opts)
+                    end
+                end
+            end
+        end
         vim.schedule(function()
             vim.o.loadplugins = loadplugins
+            local loader = require("lazy.core.loader")
+            local load = loader._load
+            function loader._load(plugin, reason, opts2)
+                for _, candidate in ipairs(cache.non_lazy_plugins) do
+                    if plugin.dir
+                        and vim.fs.abspath(candidate.rtp)
+                            == vim.fs.abspath(plugin.dir)
+                    then
+                        return
+                    end
+                end
+                load(plugin, reason, opts2)
+            end
             local lazy = require("lazy")
             local plugin_spec = require("lazier_plugin_spec")
             lazy.setup(plugin_spec, opts)
+            loader._load = load
             if opts.lazier.after then
                 opts.lazier.after()
             end

@@ -63,9 +63,12 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
     lazy.setup(module, opts)
     _G.loadfile = loadfile
 
+    local loader = require("lazy.core.loader")
+
     local spec_plugins = {}
     local colors_name = vim.g.colors_name
     local color_rtp
+    local non_lazy_plugins = {}
     local lazy_plugins = lazy.plugins()
     for plugins_path, plugins in pairs(plugin_modules) do
         local listSchema = true;
@@ -106,6 +109,39 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
                             break
                         end
                     end
+                end
+
+                local function push_non_lazy_plugin(non_lazy_plugin)
+                    for i, existing in ipairs(non_lazy_plugins) do
+                        if existing.name == non_lazy_plugin.name then
+                            non_lazy_plugins[i] = non_lazy_plugin
+                            non_lazy_plugin.dep = existing.dep and non_lazy_plugin.dep
+                            return
+                        end
+                    end
+                    table.insert(non_lazy_plugins, non_lazy_plugin)
+                end
+
+                if lazy_plugin.lazy == false and color_rtp ~= lazy_plugin.dir then
+                    for _, dep in ipairs(lazy_plugin.dependencies or {}) do
+                        for _, dep_lazy_plugin in ipairs(lazy_plugins) do
+                            if dep_lazy_plugin.name == dep then
+                                push_non_lazy_plugin({
+                                    name = dep_lazy_plugin.name,
+                                    rtp = dep_lazy_plugin.dir,
+                                    dep = true,
+                                })
+                            end
+                        end
+                    end
+                    push_non_lazy_plugin({
+                        name = lazy_plugin.name,
+                        rtp = lazy_plugin.dir,
+                        priority = lazy_plugin.priority,
+                        path = plugins_path,
+                        idx = listSchema and plugin_idx or nil,
+                        main = loader.get_main(lazy_plugin),
+                    })
                 end
                 local spec = vim.deepcopy(plugin)
                 spec.keys = lazy_plugin.keys
@@ -176,7 +212,13 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
         constants.user_compiled_path
     )
 
+    table.sort(non_lazy_plugins, function(a, b)
+        return (a.priority or 50) > (b.priority or 50)
+    end)
+
     return {
+        non_lazy_plugins = #non_lazy_plugins > 0
+            and non_lazy_plugins or nil,
         color_rtp = color_rtp
     }
 end
