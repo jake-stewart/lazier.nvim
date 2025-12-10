@@ -208,7 +208,7 @@ local function setup_lazier(module, opts)
                             m.setup(schema.opts)
                         end
                     elseif schema.config then
-                        schema.config(schema.opts)
+                        schema.config(nil, schema.opts)
                     end
                 end
             end
@@ -223,7 +223,8 @@ local function setup_lazier(module, opts)
                         and vim.fs.abspath(candidate.rtp)
                             == vim.fs.abspath(plugin.dir)
                     then
-                        return
+                        plugin.config = function() end
+                        break
                     end
                 end
                 load(plugin, reason, opts2)
