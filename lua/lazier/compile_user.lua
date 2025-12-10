@@ -7,6 +7,14 @@ local wrap = require "lazier.wrap"
 
 table.unpack = table.unpack or unpack
 
+local function get_root_index_metatable(obj)
+    local index = getmetatable(obj).__index
+    while getmetatable(index) do
+        index = getmetatable(index).__index
+    end
+    return index
+end
+
 local function fragment_functions(parent, obj, path, i)
     for k, v in pairs(obj) do
         path[i] = k
@@ -91,7 +99,7 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
             end
             local lazy_plugin
             for _, candidate in ipairs(lazy_plugins) do
-                if getmetatable(candidate).__index == plugin
+                if get_root_index_metatable(candidate) == plugin
                     or candidate.dir and plugin.dir
                     and vim.fs.abspath(candidate.dir)
                         == vim.fs.abspath(plugin.dir)
