@@ -106,6 +106,17 @@ local function setup_lazier(module, opts)
         vim.opt.rtp:prepend(lazypath)
     end
 
+    local reset_rtp = false
+    if opts.performance then
+        if opts.performance.reset_packpath then
+            vim.go.packpath = vim.env.VIMRUNTIME
+        end
+        if opts.performance.rtp and opts.performance.rtp.reset then
+            reset_rtp = true
+            opts.performance.rtp.reset = false
+        end
+    end
+
     opts.lazier = opts.lazier or {}
     if opts.lazier.enabled == false then
         if opts.lazier.before then
@@ -183,6 +194,30 @@ local function setup_lazier(module, opts)
     vim.loader.enable()
     if opts.lazier.before then
         opts.lazier.before()
+    end
+
+    if reset_rtp then
+        local lib = vim.fn.fnamemodify(vim.v.progpath, ":p:h:h") .. "/lib"
+        lib = vim.uv.fs_stat(lib .. "64") and (lib .. "64") or lib
+        lib = lib .. "/nvim"
+        local lazierRtp
+        local lazyRtp
+        for _, item in ipairs(vim.split(vim.o.rtp, ',', {plain = true})) do
+            if string.find(item, "/lazy.nvim", 1, true) then
+                lazyRtp = item
+            elseif string.find(item, "/lazier.nvim", 1, true) then
+                lazierRtp = item
+            end
+        end
+        vim.opt.rtp = {
+            vim.fn.stdpath("config"),
+            vim.fn.stdpath("data") .. "/site",
+            lazierRtp,
+            lazyRtp,
+            vim.env.VIMRUNTIME,
+            lib,
+            vim.fn.stdpath("config") .. "/after",
+        }
     end
 
     if start_lazily() then
