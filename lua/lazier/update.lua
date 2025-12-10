@@ -18,9 +18,9 @@ return function()
         error("Failed to find lazier repo")
     end
 
+    local old_version = require("lazier.version")
     cache.clear()
     print_hl("Title", "Updating Lazier...")
-    local old_version = require("lazier.version")
     local result = vim.fn.systemlist({ "git", "-C", repo_dir, "pull" })
     if type(result) == "string" then
         result = { result }

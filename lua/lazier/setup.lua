@@ -202,10 +202,12 @@ local function setup_lazier(module, opts)
                     if plugin.idx then
                         schema = schema[plugin.idx]
                     end
-                    if schema.opts and not schema.config and plugin.main then
-                        local m = require(plugin.main)
-                        if m.setup then
-                            m.setup(schema.opts)
+                    if schema.config == true or (schema.opts and not schema.config) then
+                        if plugin.main then
+                            local m = require(plugin.main)
+                            if m.setup then
+                                m.setup(schema.opts)
+                            end
                         end
                     elseif schema.config then
                         schema.config(nil, schema.opts)
