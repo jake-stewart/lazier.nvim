@@ -68,6 +68,10 @@ require("lazier").setup("plugins", {
                     [vim.fn.fnamemodify(fname, ":e")]
         end,
 
+        -- whether to bundle & byte code compile parts of the 
+        -- neovim lua api. this can be a boolean or custom list of modules.
+        compile_api = true,
+
         -- whether plugins should be included in the bytecode
         -- compiled bundle. this will make your startup slower.
         bundle_plugins = false,

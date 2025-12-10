@@ -174,7 +174,8 @@ local function setup_lazier(module, opts)
             module,
             opts,
             opts.lazier.bundle_plugins,
-            opts.lazier.generate_lazy_mappings
+            opts.lazier.generate_lazy_mappings,
+            opts.lazier.compile_api
         )
         if opts.lazier.after then
             opts.lazier.after()

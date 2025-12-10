@@ -28,7 +28,10 @@ local function fragment_functions(parent, obj, path, i)
     end
 end
 
-local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings)
+local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings, compile_api)
+    if compile_api == nil then
+        compile_api = true
+    end
     if generate_lazy_mappings ~= false then
         local Spec = require("lazy.core.plugin").Spec
         local parse = Spec.parse
@@ -183,7 +186,7 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
     end
 
     local bundled = bundler.bundle({
-        modules = {
+        modules = compile_api and (type(compile_api) == "boolean" and {
             "vim.func",
             "vim.func._memoize",
             "vim.loader",
@@ -199,7 +202,7 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
             "vim.treesitter",
             "vim.filetype",
             "vim.diagnostic",
-        },
+        } or compile_api),
         paths = paths,
         custom_modules = {
             lazier_plugin_spec = compiled_plugin_spec
