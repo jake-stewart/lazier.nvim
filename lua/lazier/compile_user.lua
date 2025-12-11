@@ -157,6 +157,7 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
                 local spec = vim.deepcopy(plugin)
                 spec.keys = lazy_plugin.keys
                 spec.event = lazy_plugin.event
+                spec.cmd = lazy_plugin.cmd
                 local parent = serializer.function_call("require", plugins_path);
                 if listSchema then
                     parent = serializer.index(parent, plugin_idx)

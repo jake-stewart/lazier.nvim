@@ -35,7 +35,8 @@ return function(spec)
                     plugin.lazy = isPluginLazy
                     local wrappers = {
                         keymaps = { obj = vim.keymap, name = "set" },
-                        -- autocmds = { obj = vim.api, name = "nvim_create_autocmd" },
+                        events = { obj = vim.api, name = "nvim_create_autocmd" },
+                        commands = { obj = vim.api, name = "nvim_create_user_command" },
                     }
                     for _, wrapper in pairs(wrappers) do
                         wrapper.original = wrapper.obj[wrapper.name]
@@ -52,6 +53,50 @@ return function(spec)
                     end
                     if not success then
                         error(result)
+                    end
+
+                    if #wrappers.commands.calls > 0 then
+                        if type(plugin.cmd) == "table" then
+                        elseif type(plugin.cmd) == "string" then
+                            plugin.cmd = { plugin.cmd --[[ @as any ]] }
+                        else
+                            plugin.cmd = {}
+                        end
+                        for _, args in ipairs(wrappers.commands.calls) do
+                            table.insert(plugin.cmd --[[ @as any ]], args[1])
+                        end
+                    end
+
+                    if #wrappers.events.calls > 0 then
+                        if type(plugin.event) == "table" then
+                        elseif type(plugin.event) == "string" then
+                            plugin.event = { plugin.event --[[ @as any ]] }
+                        else
+                            plugin.event = {}
+                        end
+                        for _, args in ipairs(wrappers.events.calls) do
+                            if type(args[1]) == "string" then
+                                table.insert(plugin.event --[[ @as any ]], args[1])
+                            elseif type(args[1]) == "table" then
+                                for _, event in ipairs(args[1]) do
+                                    table.insert(plugin.event --[[ @as any ]], event)
+                                end
+                            end
+                        end
+                        plugin.event = vim.tbl_keys(vim.iter(plugin.event):fold({}, function (acc, v)
+                          acc[v] = true
+                          return acc
+                        end))
+                        for _, e in ipairs(plugin.event --[[ @as any ]]) do
+                            if e == "VimEnter"
+                                or e == "BufEnter"
+                                or e == "WinEnter"
+                                or e == "BufWinEnter"
+                            then
+                                plugin.event = { "VeryLazy" }
+                                break
+                            end
+                        end
                     end
 
                     if #wrappers.keymaps.calls > 0 then
