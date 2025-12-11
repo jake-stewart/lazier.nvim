@@ -7,10 +7,38 @@ local wrap = require "lazier.wrap"
 
 table.unpack = table.unpack or unpack
 
+local function has_non_array_key(tbl)
+    for k, _ in pairs(tbl) do
+        if type(k) ~= "number" then
+            return true
+        end
+    end
+    return false
+end
+
 local function get_root_index_metatable(obj)
-    local index = getmetatable(obj).__index
-    while getmetatable(index) do
-        index = getmetatable(index).__index
+    local mt = getmetatable(obj)
+    if not mt or type(mt.__index) ~= "table" then
+        return nil
+    end
+    local index = mt.__index
+    while true do
+        local mt_index = getmetatable(index)
+        if not mt_index then
+            break
+        end
+        local next_index = mt_index.__index
+        if type(next_index) ~= "table" then
+            break
+        end
+        -- Only follow if next_index contains any non-array key (matching lazy plugin Spec)
+        if not has_non_array_key(next_index) then
+            break
+        end
+        if next_index == index then
+            break
+        end
+        index = next_index
     end
     return index
 end
