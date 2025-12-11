@@ -104,6 +104,7 @@ function M.bundle(opts)
         local path = modules[module_name]
         local content = fs.read_file(path)
         table.insert(buffer, "package.preload[\"" .. module_name .. "\"] = function(...)")
+        -- table.insert(buffer, "print('preload called for: " .. module_name .. "')")
         table.insert(buffer, content)
         table.insert(buffer, "end")
     end

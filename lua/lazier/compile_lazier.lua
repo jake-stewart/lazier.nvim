@@ -10,6 +10,9 @@ compiler.try_compile(
             "lazier.setup",
             "lazier.state",
             "lazier.util.fs",
+            "vim.fs",
+            "vim.uri",
+            "vim.loader",
         }
     }),
     constants.lazier_bundle_path,

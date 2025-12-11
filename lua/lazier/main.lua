@@ -1,3 +1,5 @@
+vim.loader.enable()
+
 local Lazier = {}
 
 function Lazier.setup(module, opts)
