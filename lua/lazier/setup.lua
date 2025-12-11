@@ -255,17 +255,19 @@ local function setup_lazier(module, opts)
             vim.o.loadplugins = loadplugins
             local loader = require("lazy.core.loader")
             local load = loader._load
-            function loader._load(plugin, reason, opts2)
-                for _, candidate in ipairs(cache.non_lazy_plugins) do
-                    if plugin.dir
-                        and vim.fs.abspath(candidate.rtp)
-                            == vim.fs.abspath(plugin.dir)
-                    then
-                        plugin.config = function() end
-                        break
+            if cache.non_lazy_plugins then
+                function loader._load(plugin, reason, opts2)
+                    for _, candidate in ipairs(cache.non_lazy_plugins) do
+                        if plugin.dir
+                            and vim.fs.abspath(candidate.rtp)
+                                == vim.fs.abspath(plugin.dir)
+                        then
+                            plugin.config = function() end
+                            break
+                        end
                     end
+                    load(plugin, reason, opts2)
                 end
-                load(plugin, reason, opts2)
             end
             local lazy = require("lazy")
             local plugin_spec = require("lazier_plugin_spec")
