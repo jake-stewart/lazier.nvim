@@ -1,5 +1,3 @@
-require "lazier.commands"
-
 local Lazier = {}
 
 function Lazier.setup(module, opts)

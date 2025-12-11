@@ -7,6 +7,7 @@ local function iter_module(module, path, lookup)
     end
     for name, type in fs.scan_directory(path, true) do
         if name == "init.lua" then
+            lookup[module] = fs.join(path, name)
             -- pass
         elseif type == "file" then
             if vim.endswith(name, ".lua") then
@@ -86,9 +87,15 @@ function M.bundle(opts)
         iter_module(nil, path, modules)
     end
 
+    for _, path in ipairs(opts.paths) do
+        iter_module(nil, path, modules)
+    end
+
     local module_keys = {}
     for module_name in pairs(modules) do
-        table.insert(module_keys, module_name)
+        if not opts.filter or opts.filter[module_name] then
+            table.insert(module_keys, module_name)
+        end
     end
     table.sort(module_keys)
 

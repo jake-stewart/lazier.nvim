@@ -165,18 +165,30 @@ local function setup_lazier(module, opts)
     if modified
         or cache.bundle_plugins ~= opts.lazier.bundle_plugins
     then
-        vim.loader.enable()
+        local required_mods = {}
+        local _require = require
+        --- @diagnostic disable-next-line
+        function _G.require(mod)
+            required_mods[mod] = true
+            return _require(mod)
+        end
+
         if opts.lazier.before then
             opts.lazier.before()
         end
+
+        _G.require = _require
+
         local compile_user = require("lazier.compile_user")
         local result = compile_user(
             module,
             opts,
             opts.lazier.bundle_plugins,
             opts.lazier.generate_lazy_mappings,
-            opts.lazier.compile_api
+            opts.lazier.compile_api,
+            required_mods
         )
+        require("lazier.commands")
         if opts.lazier.after then
             opts.lazier.after()
         end
@@ -273,6 +285,7 @@ local function setup_lazier(module, opts)
             local plugin_spec = require("lazier_plugin_spec")
             lazy.setup(plugin_spec, opts)
             loader._load = load
+            require("lazier.commands")
             if opts.lazier.after then
                 opts.lazier.after()
             end
@@ -290,6 +303,7 @@ local function setup_lazier(module, opts)
         local lazy = require("lazy")
         local plugin_spec = require("lazier_plugin_spec")
         lazy.setup(plugin_spec, opts)
+        require("lazier.commands")
         if opts.lazier.after then
             opts.lazier.after()
         end

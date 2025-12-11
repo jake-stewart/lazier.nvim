@@ -4,7 +4,13 @@ local constants = require "lazier.constants"
 
 compiler.try_compile(
     bundler.bundle({
-        modules = {{ "lazier", recursive = true }}
+        modules = {
+            "lazier.constants",
+            "lazier.main",
+            "lazier.setup",
+            "lazier.state",
+            "lazier.util.fs",
+        }
     }),
     constants.lazier_bundle_path,
     constants.lazier_compiled_path

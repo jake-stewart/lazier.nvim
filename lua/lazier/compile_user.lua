@@ -36,7 +36,7 @@ local function fragment_functions(parent, obj, path, i)
     end
 end
 
-local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings, compile_api)
+local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings, compile_api, required_mods)
     if compile_api == nil then
         compile_api = true
     end
@@ -194,19 +194,19 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
         end
     end
 
+    local api_mods = compile_api and (type(compile_api) == "boolean" and {
+        "vim.filetype",
+        "vim.filetype.detect",
+    } or compile_api) or {}
+
+    for _, mod in ipairs(api_mods) do
+        required_mods[mod] = true
+    end
+
     local bundled = bundler.bundle({
-        modules = compile_api and (type(compile_api) == "boolean" and {
-            "vim.func",
-            "vim.func._memoize",
-            "vim.loader",
-            "vim.uri",
-            "vim.F",
-            "vim.fs",
-            "vim.hl",
-            "vim.filetype",
-            "vim.diagnostic",
-        } or compile_api),
+        modules = api_mods,
         paths = paths,
+        -- filter = required_mods,
         custom_modules = {
             lazier_plugin_spec = compiled_plugin_spec
         }
