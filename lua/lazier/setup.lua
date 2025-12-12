@@ -271,8 +271,8 @@ local function setup_lazier(module, opts)
                 function loader._load(plugin, reason, opts2)
                     for _, candidate in ipairs(cache.non_lazy_plugins) do
                         if plugin.dir
-                            and vim.fs.abspath(candidate.rtp)
-                                == vim.fs.abspath(plugin.dir)
+                            and fs.abspath(candidate.rtp)
+                                == fs.abspath(plugin.dir)
                         then
                             plugin.config = function() end
                             break

@@ -7,40 +7,15 @@ local wrap = require "lazier.wrap"
 
 table.unpack = table.unpack or unpack
 
-local function has_non_array_key(tbl)
-    for k, _ in pairs(tbl) do
-        if type(k) ~= "number" then
+local function has_index(obj, index)
+    while obj do
+        if obj == index then
             return true
         end
+        obj = getmetatable(obj)
+        obj = obj and obj.__index
     end
     return false
-end
-
-local function get_root_index_metatable(obj)
-    local mt = getmetatable(obj)
-    if not mt or type(mt.__index) ~= "table" then
-        return nil
-    end
-    local index = mt.__index
-    while true do
-        local mt_index = getmetatable(index)
-        if not mt_index then
-            break
-        end
-        local next_index = mt_index.__index
-        if type(next_index) ~= "table" then
-            break
-        end
-        -- Only follow if next_index contains any non-array key (matching lazy plugin Spec)
-        if not has_non_array_key(next_index) then
-            break
-        end
-        if next_index == index then
-            break
-        end
-        index = next_index
-    end
-    return index
 end
 
 local function fragment_functions(parent, obj, path, i)
@@ -127,10 +102,10 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
             end
             local lazy_plugin
             for _, candidate in ipairs(lazy_plugins) do
-                if get_root_index_metatable(candidate) == plugin
+                if has_index(candidate, plugin)
                     or candidate.dir and plugin.dir
-                    and vim.fs.abspath(candidate.dir)
-                        == vim.fs.abspath(plugin.dir)
+                    and fs.abspath(candidate.dir)
+                        == fs.abspath(plugin.dir)
                 then
                     lazy_plugin = candidate
                     break
