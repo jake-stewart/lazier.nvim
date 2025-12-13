@@ -2,6 +2,28 @@ local constants = require "lazier.constants"
 local state = require "lazier.state"
 local fs = require "lazier.util.fs"
 
+local function has_lazier_rtp()
+    for _, item in ipairs(vim.split(vim.o.rtp, ',', {plain = true})) do
+        if string.find(item, "/lazier.nvim", 1, true) then
+            return true
+        end
+    end
+    return false
+end
+
+local function find_rtps()
+    local lazierRtp
+    local lazyRtp
+    for _, item in ipairs(vim.split(vim.o.rtp, ',', {plain = true})) do
+        if string.find(item, "/lazy.nvim", 1, true) then
+            lazyRtp = item
+        elseif string.find(item, "/lazier.nvim", 1, true) then
+            lazierRtp = item
+        end
+    end
+    return { lazier = lazierRtp, lazy = lazyRtp }
+end
+
 local function modified_since(stat, timestamp)
     return stat.mtime.sec > timestamp
         or stat.ctime.sec > timestamp
@@ -106,16 +128,17 @@ local function setup_lazier(module, opts)
         vim.opt.rtp:prepend(lazypath)
     end
 
-    local reset_rtp = false
-    if opts.performance then
-        if opts.performance.reset_packpath then
-            vim.go.packpath = vim.env.VIMRUNTIME
-        end
-        if opts.performance.rtp and opts.performance.rtp.reset then
-            reset_rtp = true
-            opts.performance.rtp.reset = false
-        end
-    end
+    local rtps = find_rtps()
+
+    -- local reset_rtp = false
+    -- if opts.performance then
+    --     if opts.performance.reset_packpath then
+    --         vim.go.packpath = vim.env.VIMRUNTIME
+    --     end
+    --     if opts.performance.rtp and opts.performance.rtp.reset then
+    --         reset_rtp = true
+    --     end
+    -- end
 
     opts.lazier = opts.lazier or {}
     if opts.lazier.enabled == false then
@@ -188,6 +211,9 @@ local function setup_lazier(module, opts)
             opts.lazier.compile_api,
             required_mods
         )
+        if not has_lazier_rtp() then
+            vim.opt.rtp:append(rtps.lazier)
+        end
         require("lazier.commands")
         if opts.lazier.after then
             opts.lazier.after()
@@ -209,29 +235,20 @@ local function setup_lazier(module, opts)
         opts.lazier.before()
     end
 
-    if reset_rtp then
-        local lib = vim.fn.fnamemodify(vim.v.progpath, ":p:h:h") .. "/lib"
-        lib = vim.uv.fs_stat(lib .. "64") and (lib .. "64") or lib
-        lib = lib .. "/nvim"
-        local lazierRtp
-        local lazyRtp
-        for _, item in ipairs(vim.split(vim.o.rtp, ',', {plain = true})) do
-            if string.find(item, "/lazy.nvim", 1, true) then
-                lazyRtp = item
-            elseif string.find(item, "/lazier.nvim", 1, true) then
-                lazierRtp = item
-            end
-        end
-        vim.opt.rtp = {
-            vim.fn.stdpath("config"),
-            vim.fn.stdpath("data") .. "/site",
-            lazierRtp,
-            lazyRtp,
-            vim.env.VIMRUNTIME,
-            lib,
-            vim.fn.stdpath("config") .. "/after",
-        }
-    end
+    -- if reset_rtp then
+    --     local lib = vim.fn.fnamemodify(vim.v.progpath, ":p:h:h") .. "/lib"
+    --     lib = vim.uv.fs_stat(lib .. "64") and (lib .. "64") or lib
+    --     lib = lib .. "/nvim"
+    --     vim.opt.rtp = {
+    --         vim.fn.stdpath("config"),
+    --         vim.fn.stdpath("data") .. "/site",
+    --         rtps.lazierRtp,
+    --         rtps.lazyRtp,
+    --         vim.env.VIMRUNTIME,
+    --         lib,
+    --         vim.fn.stdpath("config") .. "/after",
+    --     }
+    -- end
 
     if start_lazily() then
         local loadplugins = vim.o.loadplugins
@@ -285,6 +302,9 @@ local function setup_lazier(module, opts)
             local plugin_spec = require("lazier_plugin_spec")
             lazy.setup(plugin_spec, opts)
             loader._load = load
+            if not has_lazier_rtp() then
+                vim.opt.rtp:append(rtps.lazier)
+            end
             require("lazier.commands")
             if opts.lazier.after then
                 opts.lazier.after()
@@ -303,6 +323,9 @@ local function setup_lazier(module, opts)
         local lazy = require("lazy")
         local plugin_spec = require("lazier_plugin_spec")
         lazy.setup(plugin_spec, opts)
+            if not has_lazier_rtp() then
+                vim.opt.rtp:append(rtps.lazier)
+            end
         require("lazier.commands")
         if opts.lazier.after then
             opts.lazier.after()
