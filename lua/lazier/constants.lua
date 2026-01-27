@@ -1,16 +1,13 @@
-local fs = require "lazier.util.fs"
+local sep = vim.fn.has('win32') == 1 and "\\" or "/"
 
-local data_dir = fs.join(vim.fn.stdpath("data"), "lazier")
+local data_dir = vim.fn.stdpath("data") .. sep .. "lazier"
 
 return {
     data_dir = data_dir,
-    lazier_compiled_path = fs.join(data_dir, "lazier_compiled.lua"),
-    lazier_bundle_path = fs.join(data_dir, "lazier_bundle.lua"),
-    repo_locations = {
-        fs.join(data_dir, "lazier.nvim"),
-        fs.join(vim.fn.stdpath("data"), "lazier.nvim")
-    },
-    user_bundle_path = fs.join(data_dir, "bundle.lua"),
-    user_compiled_path = fs.join(data_dir, "compiled.lua"),
-    cache_path = fs.join(data_dir, "cache.json")
+    lazier_compiled_path = data_dir .. sep .. "lazier_compiled.lua",
+    lazier_bundle_path = data_dir .. sep .. "lazier_bundle.lua",
+    repo_dir = data_dir .. sep .. "lazier.nvim",
+    user_bundle_path = data_dir .. sep .. "bundle.lua",
+    user_compiled_path = data_dir .. sep .. "compiled.lua",
+    cache_path = data_dir .. sep .. "cache.json"
 }

@@ -1,5 +1,28 @@
 local np = require "lazier.util.npack"
 
+local AUTOCOMMAND_GROUPS = {
+    insertenter = {
+        "insertenter",
+        "insertleave",
+        "insertchange",
+        "textchangedi",
+        "textchangedp",
+        "cursormovedi",
+        "completechanged",
+    },
+    cmdlineenter = {
+        "cmdlineenter",
+        "cmdlineleave",
+        "cmdlinechanged",
+    },
+    cmdwinenter = {
+        "cmdwinenter",
+        "cmdwinleave",
+    }
+}
+
+local commands = vim.api.nvim_get_commands({ builtin = false })
+
 --- @param spec LazyPluginSpec | LazyPluginSpec[]
 --- @return LazyPluginSpec
 return function(spec)
@@ -36,7 +59,6 @@ return function(spec)
                     local wrappers = {
                         keymaps = { obj = vim.keymap, name = "set" },
                         events = { obj = vim.api, name = "nvim_create_autocmd" },
-                        commands = { obj = vim.api, name = "nvim_create_user_command" },
                     }
                     for _, wrapper in pairs(wrappers) do
                         wrapper.original = wrapper.obj[wrapper.name]
@@ -55,43 +77,89 @@ return function(spec)
                         error(result)
                     end
 
-                    if #wrappers.commands.calls > 0 then
+                    local new_commands = vim.api.nvim_get_commands({ builtin = false })
+                    for k in pairs(new_commands) do
+                      if not commands[k] then
                         if type(plugin.cmd) == "table" then
                         elseif type(plugin.cmd) == "string" then
                             plugin.cmd = { plugin.cmd --[[ @as any ]] }
                         else
                             plugin.cmd = {}
                         end
-                        for _, args in ipairs(wrappers.commands.calls) do
-                            table.insert(plugin.cmd --[[ @as any ]], args[1])
-                        end
+                        table.insert(plugin.cmd --[[ @as any ]], k)
+                      end
                     end
+                    commands = new_commands
 
                     if #wrappers.events.calls > 0 then
+                        if type(plugin.ft) == "table" then
+                        elseif type(plugin.ft) == "string" then
+                            plugin.ft = { plugin.ft --[[ @as any ]] }
+                        else
+                            plugin.ft = {}
+                        end
                         if type(plugin.event) == "table" then
                         elseif type(plugin.event) == "string" then
                             plugin.event = { plugin.event --[[ @as any ]] }
                         else
                             plugin.event = {}
                         end
+                        local function add_filetypes(au_opts)
+                            if type(au_opts) == "table" then
+                                if type(au_opts.pattern) == "string" then
+                                    table.insert(plugin.ft, au_opts.pattern)
+                                elseif type(au_opts.pattern) == "table" then
+                                    for _, ft in ipairs(au_opts.pattern) do
+                                        table.insert(plugin.ft, ft)
+                                    end
+                                end
+                            end
+                        end
                         for _, args in ipairs(wrappers.events.calls) do
                             if type(args[1]) == "string" then
-                                table.insert(plugin.event --[[ @as any ]], args[1])
+                                local lower = args[1]:lower()
+                                if lower == "filetype" then
+                                    add_filetypes(args[2])
+                                else
+                                    table.insert(plugin.event --[[ @as any ]], args[1])
+                                end
                             elseif type(args[1]) == "table" then
                                 for _, event in ipairs(args[1]) do
                                     table.insert(plugin.event --[[ @as any ]], event)
                                 end
                             end
                         end
-                        plugin.event = vim.tbl_keys(vim.iter(plugin.event):fold({}, function (acc, v)
-                          acc[v] = true
-                          return acc
-                        end))
+                        local uniq_events = {}
+                        for _, v in ipairs(plugin.event) do
+                            uniq_events[v:lower()] = true
+                        end
+                        for enter_cmd, group in pairs(AUTOCOMMAND_GROUPS) do
+                            local has_autocmd = false
+                            for _, autocmd in ipairs(group) do
+                                if uniq_events[autocmd] then
+                                    has_autocmd = true
+                                    break
+                                end
+                            end
+                            if has_autocmd then
+                                for _, autocmd in ipairs(group) do
+                                    uniq_events[autocmd] = nil
+                                end
+                                uniq_events[enter_cmd] = true
+                            end
+                        end
+                        local uniq_ft = {}
+                        for _, v in ipairs(plugin.ft) do
+                            uniq_ft[v:lower()] = true
+                        end
+                        plugin.event = vim.tbl_keys(uniq_events)
+                        plugin.ft = vim.tbl_keys(uniq_ft)
                         for _, e in ipairs(plugin.event --[[ @as any ]]) do
-                            if e == "VimEnter"
-                                or e == "BufEnter"
-                                or e == "WinEnter"
-                                or e == "BufWinEnter"
+                            if e == "vimenter"
+                                or e == "bufenter"
+                                or e == "winenter"
+                                or e == "bufwinenter"
+                                or e == "verylazy"
                             then
                                 plugin.event = { "VeryLazy" }
                                 break

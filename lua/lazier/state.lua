@@ -1,3 +1,5 @@
 return {
-    compiled = false
+    compiled = false,
+    const_modules = {},
+    compile_modules = {}
 }

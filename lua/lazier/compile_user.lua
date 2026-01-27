@@ -4,6 +4,7 @@ local serializer = require "lazier.util.serializer"
 local compiler = require "lazier.util.compiler"
 local constants = require "lazier.constants"
 local wrap = require "lazier.wrap"
+local state = require "lazier.state"
 
 table.unpack = table.unpack or unpack
 
@@ -39,11 +40,25 @@ local function fragment_functions(parent, obj, path, i)
     end
 end
 
-local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings, compile_api, required_mods)
-    if compile_api == nil then
-        compile_api = true
+local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
+    vim.loader.enable()
+    local required_mods = {}
+    local _require = require
+    --- @diagnostic disable-next-line
+    function _G.require(mod)
+        if not vim.startswith("mod", "vim.") then
+            required_mods[mod] = true
+        end
+        return _require(mod)
     end
-    if generate_lazy_mappings ~= false then
+
+    if opts.lazier.before then
+        opts.lazier.before()
+    end
+
+    _G.require = _require
+
+    if opts.lazier.generate_lazy_mappings ~= false then
         local Spec = require("lazy.core.plugin").Spec
         local parse = Spec.parse
         function Spec:parse(spec)
@@ -160,6 +175,7 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
                 local spec = vim.deepcopy(plugin)
                 spec.keys = lazy_plugin.keys
                 spec.event = lazy_plugin.event
+                spec.ft = lazy_plugin.ft
                 spec.cmd = lazy_plugin.cmd
                 local parent = serializer.function_call("require", plugins_path);
                 if listSchema then
@@ -188,7 +204,7 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
     local paths = {
         vim.fn.stdpath("config") .. "/lua"
     }
-    if bundle_plugins then
+    if opts.lazier.bundle_plugins then
         local prefix = fs.join(vim.fn.stdpath("data"), "lazy")
         for _, plugin in ipairs(require("lazy").plugins()) do
             if plugin.dir and vim.startswith(plugin.dir, prefix) then
@@ -197,22 +213,43 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
         end
     end
 
-    local api_mods = compile_api and (type(compile_api) == "boolean" and {
-        "vim.filetype",
-        "vim.filetype.detect",
-    } or compile_api) or {}
+    -- if opts.lazier.compile_api == nil then
+    --     opts.lazier.compile_api = true
+    -- end
+    -- local api_mods = opts.lazier.compile_api and (type(opts.lazier.compile_api) == "boolean" and {
+    --     'vim.filetype',
+    --     'vim.filetype.detect',
+    --     'vim.treesitter.language',
+    --     'vim.func',
+    --     'vim.func._memoize',
+    --     'vim.treesitter.query',
+    --     'vim.treesitter._range',
+    --     'vim.treesitter.languagetree',
+    --     'vim.treesitter',
+    --     'vim.F',
+    --     'vim.treesitter.highlighter',
+    -- } or opts.lazier.compile_api) or {}
+    --
+    -- for _, mod in ipairs(api_mods) do
+    --     required_mods[mod] = true
+    -- end
 
-    for _, mod in ipairs(api_mods) do
-        required_mods[mod] = true
+    local custom_modules = {
+        lazier_plugin_spec = compiled_plugin_spec
+    }
+
+    for mod, _ in pairs(state.const_modules) do
+        custom_modules[mod] = "return " .. serializer.serialize(package.loaded[mod])
+    end
+    for mod, src in pairs(state.compile_modules) do
+        custom_modules[mod] = src
     end
 
     local bundled = bundler.bundle({
-        modules = api_mods,
+        -- modules = api_mods,
         paths = paths,
-        -- filter = required_mods,
-        custom_modules = {
-            lazier_plugin_spec = compiled_plugin_spec
-        }
+        filter = required_mods,
+        custom_modules = custom_modules
     })
 
     compiler.try_compile(
@@ -225,11 +262,24 @@ local function compile_user(module, opts, bundle_plugins, generate_lazy_mappings
         return (a.priority or 50) > (b.priority or 50)
     end)
 
-    return {
+    local result = {
         non_lazy_plugins = #non_lazy_plugins > 0
             and non_lazy_plugins or nil,
         color_rtp = color_rtp
     }
+
+    if not has_lazier_rtp() then
+        vim.opt.rtp:append(rtps.lazier)
+    end
+    require("lazier.commands")
+    if opts.lazier.after then
+        opts.lazier.after()
+    end
+    cache.colorscheme = vim.g.colors_name
+    cache.color_rtp = result.color_rtp
+    cache.non_lazy_plugins = result.non_lazy_plugins
+    cache.bundle_plugins = opts.lazier.bundle_plugins
+    fs.write_file(constants.cache_path, vim.json.encode(cache))
 end
 
 return compile_user

@@ -91,6 +91,13 @@ function M.bundle(opts)
         iter_module(nil, path, modules)
     end
 
+    local custom_module_keys = {}
+    for module_name in pairs(opts.custom_modules) do
+        modules[module_name] = nil
+        table.insert(custom_module_keys, module_name)
+    end
+    table.sort(custom_module_keys)
+
     local module_keys = {}
     for module_name in pairs(modules) do
         if not opts.filter or opts.filter[module_name] then
@@ -109,11 +116,6 @@ function M.bundle(opts)
         table.insert(buffer, "end")
     end
 
-    local custom_module_keys = {}
-    for module_name in pairs(opts.custom_modules) do
-        table.insert(custom_module_keys, module_name)
-    end
-    table.sort(custom_module_keys)
     for _, module_name in ipairs(custom_module_keys) do
         table.insert(buffer, "package.preload[\"" .. module_name .. "\"] = function(...)")
         table.insert(buffer, opts.custom_modules[module_name])

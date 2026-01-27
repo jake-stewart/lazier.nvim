@@ -1,10 +1,11 @@
-vim.loader.enable()
-
 local Lazier = {}
 
 function Lazier.setup(module, opts)
-    local setup_lazier = require("lazier.setup")
-    setup_lazier(module, opts)
+    require("lazier.setup")(module, opts)
 end
+
+local lazier_require = require("lazier.require")
+Lazier.const_require = lazier_require.const_require
+Lazier.compile_require = lazier_require.compile_require
 
 return setmetatable(Lazier, Lazier)

@@ -1,8 +1,7 @@
-local compiled = table.concat({
-    vim.fn.stdpath("data"), "lazier", "lazier_compiled.lua"
-}, vim.fn.has('win32') == 1 and "\\" or "/")
+local sep = vim.fn.has('win32') == 1 and "\\" or "/"
+local compiled = vim.fn.stdpath("data") .. sep .. "lazier" .. sep .. "lazier_compiled.lua"
 
-if not (vim.uv or vim.loop).fs_stat(compiled) then
+if not vim.uv.fs_stat(compiled) then
     require("lazier.compile_lazier")
 end
 

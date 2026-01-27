@@ -7,12 +7,13 @@ compiler.try_compile(
         modules = {
             "lazier.constants",
             "lazier.main",
+            "lazier.require",
             "lazier.setup",
             "lazier.state",
             "lazier.util.fs",
-            "vim.fs",
-            "vim.uri",
-            "vim.loader",
+            -- "vim.fs",
+            -- "vim.loader",
+            -- "vim.uri",
         }
     }),
     constants.lazier_bundle_path,

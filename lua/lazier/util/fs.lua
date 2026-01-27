@@ -54,6 +54,8 @@ function M.scan_directory(path, allow_empty)
     end
 end
 
-M.abspath = vim.fs.abspath
+function M.abspath(path)
+    return vim.fs.abspath(path)
+end
 
 return M

@@ -7,21 +7,14 @@ local function print_hl(hl, message)
 end
 
 return function()
-    local repo_dir
-    for _, candidate in ipairs(constants.repo_locations) do
-        if fs.stat(candidate) then
-            repo_dir = candidate
-            break
-        end
-    end
-    if not repo_dir then
+    if not fs.stat(constants.repo_dir) then
         error("Failed to find lazier repo")
     end
 
     local old_version = require("lazier.version")
     cache.clear()
     print_hl("Title", "Updating Lazier...")
-    local result = vim.fn.systemlist({ "git", "-C", repo_dir, "pull" })
+    local result = vim.fn.systemlist({ "git", "-C", constants.repo_dir, "pull" })
     if type(result) == "string" then
         result = { result }
     end

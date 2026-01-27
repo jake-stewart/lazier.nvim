@@ -24,32 +24,6 @@ local function find_rtps()
     return { lazier = lazierRtp, lazy = lazyRtp }
 end
 
-local function modified_since(stat, timestamp)
-    return stat.mtime.sec > timestamp
-        or stat.ctime.sec > timestamp
-end
-
-local function check_modified_tree(root, timestamp)
-    local modified = false
-    local tally = 0
-    for name, type in fs.scan_directory(root, true) do
-        tally = tally + 1
-        local path = fs.join(root, name)
-
-        if type == "file" and name:find("%.lua$") then
-            if modified_since(fs.stat(path), timestamp) then
-                modified = true
-            end
-        elseif type == "directory" and not name:find("^%.") then
-            local child_modified, child_tally =
-                check_modified_tree(path, timestamp)
-            modified = modified or child_modified
-            tally = tally + child_tally
-        end
-    end
-    return modified, tally
-end
-
 local function check_cache(detect_config_changes)
     local recompile = false
     local last_modified = 0
@@ -71,25 +45,9 @@ local function check_cache(detect_config_changes)
         end
     end
 
-    local modified, tally
+    local tally
     if detect_config_changes then
-        local config_dir = vim.fn.stdpath("config")
-        local source_path = fs.join(config_dir, "lua")
-
-        modified, tally = check_modified_tree(source_path, last_modified)
-        local extra_files = {
-            fs.join(config_dir, "lazy-lock.json")
-        }
-        for _, file in ipairs(extra_files) do
-            local stat = fs.stat(file)
-            if stat then
-                tally = tally + 1
-                if modified_since(stat, last_modified) then
-                    modified = true
-                end
-            end
-        end
-        recompile = recompile or modified or tally ~= last_tally
+        recompile, tally = require("lazier.change_detect")(recompile, last_modified, last_tally)
     end
 
     local timestamp = tonumber(vim.fn.strftime('%s'))
@@ -113,17 +71,7 @@ local function setup_lazier(module, opts)
     if not vim.o.rtp:find("/lazy/lazy.nvim") then
         local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
         if not (vim.uv or vim.loop).fs_stat(lazypath) then
-          local lazyrepo = "https://github.com/folke/lazy.nvim.git"
-          local out = vim.fn.system({ "git", "clone", "--filter=blob:none", "--branch=stable", lazyrepo, lazypath })
-          if vim.v.shell_error ~= 0 then
-            vim.api.nvim_echo({
-              { "Failed to clone lazy.nvim:\n", "ErrorMsg" },
-              { out, "WarningMsg" },
-              { "\nPress any key to exit..." },
-            }, true, {})
-            vim.fn.getchar()
-            os.exit(1)
-          end
+            require("lazier.clone_lazy")(lazypath)
         end
         vim.opt.rtp:prepend(lazypath)
     end
@@ -156,29 +104,6 @@ local function setup_lazier(module, opts)
         opts.lazier.detect_changes = true
     end
 
-    local function start_lazily()
-        if type(opts.lazier.start_lazily) == "function" then
-            return opts.lazier.start_lazily()
-        elseif opts.lazier.start_lazily == nil then
-            local fname = vim.fn.expand("%")
-            if fname == "" then
-                return true
-            end
-            local non_lazy_loadable_extensions = {
-                zip = true,
-                tar = true,
-                gz = true
-            }
-            local stat = fs.stat(fname)
-            return not stat
-                or stat.type == "file"
-                and not non_lazy_loadable_extensions
-                    [vim.fn.fnamemodify(fname, ":e")]
-        else
-            return opts.lazier.start_lazily
-        end
-    end
-
     if not fs.stat(constants.data_dir) then
         fs.create_directory(constants.data_dir)
     end
@@ -188,49 +113,21 @@ local function setup_lazier(module, opts)
     if modified
         or cache.bundle_plugins ~= opts.lazier.bundle_plugins
     then
-        local required_mods = {}
-        local _require = require
-        --- @diagnostic disable-next-line
-        function _G.require(mod)
-            required_mods[mod] = true
-            return _require(mod)
-        end
-
-        if opts.lazier.before then
-            opts.lazier.before()
-        end
-
-        _G.require = _require
-
         local compile_user = require("lazier.compile_user")
-        local result = compile_user(
-            module,
-            opts,
-            opts.lazier.bundle_plugins,
-            opts.lazier.generate_lazy_mappings,
-            opts.lazier.compile_api,
-            required_mods
-        )
-        if not has_lazier_rtp() then
-            vim.opt.rtp:append(rtps.lazier)
-        end
-        require("lazier.commands")
-        if opts.lazier.after then
-            opts.lazier.after()
-        end
-        cache.colorscheme = vim.g.colors_name
-        cache.color_rtp = result.color_rtp
-        cache.non_lazy_plugins = result.non_lazy_plugins
-        cache.bundle_plugins = opts.lazier.bundle_plugins
-        fs.write_file(constants.cache_path, vim.json.encode(cache))
+        compile_user(module, opts, cache, rtps, has_lazier_rtp)
         return
     end
 
     state.compiled = true
 
-    vim.loader.enable(false)
-    loadfile(constants.user_compiled_path, "b")()
-    vim.loader.enable()
+    if package.loaded["vim.loader"] then
+        vim.loader.enable(false)
+        loadfile(constants.user_compiled_path, "b")()
+        vim.loader.enable()
+    else
+        loadfile(constants.user_compiled_path, "b")()
+    end
+
     if opts.lazier.before then
         opts.lazier.before()
     end
@@ -250,7 +147,16 @@ local function setup_lazier(module, opts)
     --     }
     -- end
 
-    if start_lazily() then
+    local start_lazily
+    if type(opts.lazier.start_lazily) == "function" then
+        start_lazily = opts.lazier.start_lazily()
+    elseif opts.lazier.start_lazily == nil then
+        start_lazily = require("lazier.defaults").start_lazily()
+    else
+        start_lazily = opts.lazier.start_lazily
+    end
+
+    if start_lazily then
         local loadplugins = vim.o.loadplugins
         vim.o.loadplugins = false
         if cache.color_rtp then
@@ -281,45 +187,11 @@ local function setup_lazier(module, opts)
             end
         end
         vim.schedule(function()
-            vim.o.loadplugins = loadplugins
-            local loader = require("lazy.core.loader")
-            local load = loader._load
-            if cache.non_lazy_plugins then
-                function loader._load(plugin, reason, opts2)
-                    for _, candidate in ipairs(cache.non_lazy_plugins) do
-                        if plugin.dir
-                            and fs.abspath(candidate.rtp)
-                                == fs.abspath(plugin.dir)
-                        then
-                            plugin.config = function() end
-                            break
-                        end
-                    end
-                    load(plugin, reason, opts2)
-                end
-            end
-            local lazy = require("lazy")
-            local plugin_spec = require("lazier_plugin_spec")
-            lazy.setup(plugin_spec, opts)
-            loader._load = load
-            if not has_lazier_rtp() then
-                vim.opt.rtp:append(rtps.lazier)
-            end
-            require("lazier.commands")
-            if opts.lazier.after then
-                opts.lazier.after()
-            end
-            if vim.fn.expand("%") ~= "" then
-                vim.schedule(function()
-                    pcall(vim.cmd.edit)
-                end)
-            elseif vim.o.ft ~= "" then
-                vim.schedule(function()
-                    vim.cmd.setf(vim.o.ft)
-                end)
-            end
+            require("lazier.after_lazy_start")(
+                opts, loadplugins, cache, rtps, has_lazier_rtp)
         end)
     else
+        vim.loader.enable()
         local lazy = require("lazy")
         local plugin_spec = require("lazier_plugin_spec")
         lazy.setup(plugin_spec, opts)
