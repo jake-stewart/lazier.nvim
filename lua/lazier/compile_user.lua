@@ -86,7 +86,7 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
         function Spec:parse(spec)
             parse(self, spec)
             for _, plugin in pairs(self.plugins) do
-                wrap(plugin)
+                wrap(plugin, opts.lazier.infer_events)
             end
         end
     end
