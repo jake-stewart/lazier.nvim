@@ -115,13 +115,18 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
         end
         package.loaded[plugins_path] = plugins
         for plugin_idx, plugin in ipairs(plugins) do
+            if type(plugin) == "string" then
+                plugin = { plugin }
+            end
             local import = plugin.import
             if import then
                 plugin = require(import)
             end
             local lazy_plugin
             for _, candidate in ipairs(lazy_plugins) do
+                -- lazy rebuilds url-only specs into fresh tables, so they have no index chain back to ours
                 if has_index(candidate, plugin)
+                    or plugin[1] ~= nil and candidate[1] == plugin[1]
                     or candidate.dir and plugin.dir
                     and fs.abspath(candidate.dir)
                         == fs.abspath(plugin.dir)
