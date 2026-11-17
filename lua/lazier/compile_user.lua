@@ -110,9 +110,28 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
         end
     end
 
+    -- lets wrap tell a config's own calls from those of plugins it pulls in while running
+    local lazy_loader = require("lazy.core.loader")
+    local load_plugin = lazy_loader._load
+    function lazy_loader._load(plugin, ...)
+        local commands = vim.api.nvim_get_commands({ builtin = false })
+        table.insert(state.loading, plugin.name)
+        local success, result = pcall(load_plugin, plugin, ...)
+        table.remove(state.loading)
+        for k in pairs(vim.api.nvim_get_commands({ builtin = false })) do
+            if not commands[k] then
+                state.claimed_commands[k] = true
+            end
+        end
+        if not success then
+            error(result, 0)
+        end
+    end
+
     local lazy = require("lazy")
     lazy.setup(module, opts)
     _G.loadfile = loadfile
+    lazy_loader._load = load_plugin
 
     local loader = require("lazy.core.loader")
 
