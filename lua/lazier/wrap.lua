@@ -1,4 +1,5 @@
 local np = require "lazier.util.npack"
+local state = require "lazier.state"
 
 local AUTOCOMMAND_GROUPS = {
     insertenter = {
@@ -20,8 +21,6 @@ local AUTOCOMMAND_GROUPS = {
         "cmdwinleave",
     }
 }
-
-local commands = vim.api.nvim_get_commands({ builtin = false })
 
 --- @param spec LazyPluginSpec | LazyPluginSpec[]
 --- @return LazyPluginSpec
@@ -65,10 +64,16 @@ return function(spec)
                         wrapper.calls = {}
                         wrapper.obj[wrapper.name] = function(...)
                             local ret = wrapper.original(...)
-                            table.insert(wrapper.calls, np.pack(...))
+                            if state.loading[#state.loading] == lazyPlugin.name then
+                                table.insert(wrapper.calls, np.pack(...))
+                            end
                             return ret
                         end
                     end
+                    -- snapshot here, not once per session: commands other plugins and the user's own config
+                    -- create between two wrapped configs would otherwise become triggers of the next one;
+                    -- claimed ones come from plugins this config pulled in
+                    local commands = vim.api.nvim_get_commands({ builtin = false })
                     local success, result = pcall(pluginConfig)
                     for _, wrapper in pairs(wrappers) do
                         wrapper.obj[wrapper.name] = wrapper.original
@@ -79,7 +84,7 @@ return function(spec)
 
                     local new_commands = vim.api.nvim_get_commands({ builtin = false })
                     for k in pairs(new_commands) do
-                      if not commands[k] then
+                      if not commands[k] and not state.claimed_commands[k] then
                         if type(plugin.cmd) == "table" then
                         elseif type(plugin.cmd) == "string" then
                             plugin.cmd = { plugin.cmd --[[ @as any ]] }
@@ -89,7 +94,6 @@ return function(spec)
                         table.insert(plugin.cmd --[[ @as any ]], k)
                       end
                     end
-                    commands = new_commands
 
                     if #wrappers.events.calls > 0 then
                         if type(plugin.ft) == "table" then
