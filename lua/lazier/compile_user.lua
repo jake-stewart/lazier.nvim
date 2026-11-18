@@ -115,8 +115,9 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
         end
         package.loaded[plugins_path] = plugins
         for plugin_idx, plugin in ipairs(plugins) do
-            if plugin.import then
-                plugin = require(plugin.import)
+            local import = plugin.import
+            if import then
+                plugin = require(import)
             end
             local lazy_plugin
             for _, candidate in ipairs(lazy_plugins) do
@@ -180,8 +181,8 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
                 spec.event = lazy_plugin.event
                 spec.ft = lazy_plugin.ft
                 spec.cmd = lazy_plugin.cmd
-                local parent = serializer.function_call("require", plugins_path);
-                if listSchema then
+                local parent = serializer.function_call("require", import or plugins_path)
+                if listSchema and not import then
                     parent = serializer.index(parent, plugin_idx)
                 end
                 fragment_functions(serializer.serialize(parent), spec, {}, 1)
