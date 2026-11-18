@@ -7,6 +7,7 @@ compiler.try_compile(
         modules = {
             "lazier.constants",
             "lazier.main",
+            "lazier.merge_opts",
             "lazier.require",
             "lazier.setup",
             "lazier.state",
