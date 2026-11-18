@@ -86,7 +86,7 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
         function Spec:parse(spec)
             parse(self, spec)
             for _, plugin in pairs(self.plugins) do
-                wrap(plugin)
+                wrap(plugin, opts.lazier.infer_events)
             end
         end
     end
@@ -110,11 +110,23 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
         end
     end
 
+    local loader = require("lazy.core.loader")
+    local load_plugin = loader._load
+    function loader._load(plugin, ...)
+        local commands = vim.api.nvim_get_commands({ builtin = false })
+        state.commands[plugin.name] = commands
+        load_plugin(plugin, ...)
+        for k in pairs(vim.api.nvim_get_commands({ builtin = false })) do
+            if not commands[k] then
+                state.claimed_commands[k] = true
+            end
+        end
+    end
+
     local lazy = require("lazy")
     lazy.setup(module, opts)
     _G.loadfile = loadfile
-
-    local loader = require("lazy.core.loader")
+    loader._load = load_plugin
 
     local spec_plugins = {}
     local colors_name = vim.g.colors_name

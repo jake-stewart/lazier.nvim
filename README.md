@@ -80,6 +80,15 @@ require("lazier").setup("plugins", {
         -- by identifying the mappings set when the plugin loads
         generate_lazy_mappings = true,
 
+        -- when autocommands a plugin creates while loading become its
+        -- lazy loading events (BufEnter-like ones mean VeryLazy).
+        -- triggers declared in the spec (keys, cmd, ft, event, lazy = true)
+        -- are always kept as they are.
+        --   "always": whenever it creates any
+        --   "fallback": only if it set no mappings or commands to load it by
+        --   false: never; they are just created when the plugin loads
+        infer_events = "always",
+
         -- automatically rebundle and compile nvim config when it changes
         -- if set to false then you will need to :LazierClear manually
         detect_changes = true,

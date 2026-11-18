@@ -1,4 +1,5 @@
 local np = require "lazier.util.npack"
+local state = require "lazier.state"
 
 local AUTOCOMMAND_GROUPS = {
     insertenter = {
@@ -21,12 +22,16 @@ local AUTOCOMMAND_GROUPS = {
     }
 }
 
-local commands = vim.api.nvim_get_commands({ builtin = false })
-
 --- @param spec LazyPluginSpec | LazyPluginSpec[]
+--- @param infer_events? "always" | "fallback" | false
 --- @return LazyPluginSpec
-return function(spec)
+return function(spec, infer_events)
     spec = spec or {}
+    if infer_events == nil then
+        infer_events = "always"
+    end
+    assert(infer_events == "always" or infer_events == "fallback" or infer_events == false,
+        "lazier: infer_events must be \"always\", \"fallback\" or false")
 
     local plugins = spec
     if
@@ -41,6 +46,11 @@ return function(spec)
         if plugin.enabled == false or plugin.lazy == false then
         else
             local pluginConfig = plugin.config
+            local declares_triggers = plugin.lazy == true
+                or plugin.keys ~= nil
+                or plugin.cmd ~= nil
+                or plugin.ft ~= nil
+                or plugin.event ~= nil
             local pluginOpts = plugin.opts
             if (type(pluginConfig) == "function") ~= (pluginOpts ~= nil) then
                 local isPluginLazy = plugin.lazy
@@ -56,6 +66,7 @@ return function(spec)
                         end
                     end
                     plugin.lazy = isPluginLazy
+                    local loading = require("lazy.core.loader").loading
                     local wrappers = {
                         keymaps = { obj = vim.keymap, name = "set" },
                         events = { obj = vim.api, name = "nvim_create_autocmd" },
@@ -65,10 +76,14 @@ return function(spec)
                         wrapper.calls = {}
                         wrapper.obj[wrapper.name] = function(...)
                             local ret = wrapper.original(...)
-                            table.insert(wrapper.calls, np.pack(...))
+                            if loading[#loading] == lazyPlugin then
+                                table.insert(wrapper.calls, np.pack(...))
+                            end
                             return ret
                         end
                     end
+                    local commands = state.commands[lazyPlugin.name]
+                        or vim.api.nvim_get_commands({ builtin = false })
                     local success, result = pcall(pluginConfig)
                     for _, wrapper in pairs(wrappers) do
                         wrapper.obj[wrapper.name] = wrapper.original
@@ -78,20 +93,30 @@ return function(spec)
                     end
 
                     local new_commands = vim.api.nvim_get_commands({ builtin = false })
+                    local recorded_commands = false
                     for k in pairs(new_commands) do
-                      if not commands[k] then
+                      if not commands[k] and not state.claimed_commands[k] then
+                        recorded_commands = true
                         if type(plugin.cmd) == "table" then
                         elseif type(plugin.cmd) == "string" then
                             plugin.cmd = { plugin.cmd --[[ @as any ]] }
                         else
                             plugin.cmd = {}
                         end
-                        table.insert(plugin.cmd --[[ @as any ]], k)
+                        if not vim.tbl_contains(plugin.cmd --[[ @as any ]], k) then
+                            table.insert(plugin.cmd --[[ @as any ]], k)
+                        end
                       end
                     end
-                    commands = new_commands
 
-                    if #wrappers.events.calls > 0 then
+                    local events_load_it = infer_events == "always"
+                        or infer_events == "fallback"
+                        and not recorded_commands
+                        and #wrappers.keymaps.calls == 0
+                    if #wrappers.events.calls > 0
+                        and not declares_triggers
+                        and events_load_it
+                    then
                         if type(plugin.ft) == "table" then
                         elseif type(plugin.ft) == "string" then
                             plugin.ft = { plugin.ft --[[ @as any ]] }
