@@ -99,7 +99,10 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
     local color_rtp
     local non_lazy_plugins = {}
     local lazy_plugins = lazy.plugins()
-    for plugins_path, plugins in pairs(plugin_modules) do
+    local plugins_paths = vim.tbl_keys(plugin_modules)
+    table.sort(plugins_paths)
+    for _, plugins_path in ipairs(plugins_paths) do
+        local plugins = plugin_modules[plugins_path]
         local listSchema = true;
         if
             type(plugins[1]) == "string"
