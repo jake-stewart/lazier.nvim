@@ -19,25 +19,47 @@ local function has_index(obj, index)
     return false
 end
 
-local function fragment_functions(parent, obj, path, i)
-    for k, v in pairs(obj) do
-        path[i] = k
-        if type(v) == "function" then
-            local code = "function(...) return " .. parent
-            for j = 1, i do
-                if serializer.valid_identifier(path[j]) then
-                    code = code .. "." .. path[j]
-                else
-                    code = code .. "[" .. serializer.serialize(path[j]) .. "]"
-                end
+local dict_metatable = getmetatable(vim.empty_dict())
+
+local function count_tables(obj, counts)
+    counts[obj] = (counts[obj] or 0) + 1
+    if counts[obj] == 1 then
+        for _, v in pairs(obj) do
+            if type(v) == "table" then
+                count_tables(v, counts)
             end
-            code = code .. "(...) end"
-            obj[k] = serializer.fragment(code)
-        elseif type(v) == "table" then
-            fragment_functions(parent, v, path, i + 1)
         end
-        path[i] = nil
     end
+end
+
+local function fragment_spec(parent, obj, path, counts)
+    local spec = {}
+    for k, v in pairs(obj) do
+        if type(k) == "table" or not serializer.can_serialize(k) then
+            return nil
+        end
+        table.insert(path, k)
+        local ref = serializer.index(parent, table.unpack(path))[1]
+        if type(v) == "function" then
+            spec[k] = serializer.fragment("function(...) return " .. ref .. "(...) end")
+        elseif type(v) == "table" and getmetatable(v) == serializer.Fragment then
+            spec[k] = v
+        elseif type(v) == "table" then
+            local metatable = getmetatable(v)
+            if counts[v] == 1
+                and (#path == 1 or not metatable or metatable == dict_metatable)
+            then
+                spec[k] = fragment_spec(parent, v, path, counts)
+            end
+            spec[k] = spec[k] or serializer.fragment(ref)
+        elseif serializer.can_serialize(v) then
+            spec[k] = v
+        else
+            spec[k] = serializer.fragment(ref)
+        end
+        table.remove(path)
+    end
+    return setmetatable(spec, getmetatable(obj) == dict_metatable and dict_metatable or nil)
 end
 
 local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
@@ -124,7 +146,6 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
             end
             local lazy_plugin
             for _, candidate in ipairs(lazy_plugins) do
-                -- lazy rebuilds url-only specs into fresh tables, so they have no index chain back to ours
                 if has_index(candidate, plugin)
                     or plugin[1] ~= nil and candidate[1] == plugin[1]
                     or candidate.dir and plugin.dir
@@ -181,9 +202,10 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
                         main = loader.get_main(lazy_plugin),
                     })
                 end
-                -- lazy chains a spec to earlier specs of the same plugin via a metatable; those are compiled
-                -- as their own entries, and a metatable on the entry makes it unserializable
-                local spec = setmetatable(vim.deepcopy(plugin), nil)
+                local spec = {}
+                for k, v in pairs(plugin) do
+                    spec[k] = v
+                end
                 spec.keys = lazy_plugin.keys
                 spec.event = lazy_plugin.event
                 spec.ft = lazy_plugin.ft
@@ -192,38 +214,21 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
                 if listSchema and not import then
                     parent = serializer.index(parent, plugin_idx)
                 end
-                fragment_functions(serializer.serialize(parent), spec, {}, 1)
-                for _, v in pairs(spec) do
-                    if type(v) == "table"
-                        and getmetatable(v) ~= serializer.Fragment
-                    then
-                        setmetatable(v, nil)
-                    end
+                parent = serializer.serialize(parent)
+                if type(spec.opts) == "table" and not serializer.can_serialize(spec.opts) then
+                    spec.opts = serializer.fragment("function(_, opts) return "
+                        .. serializer.function_call(
+                            serializer.function_call("require", "lazier.merge_opts")[1],
+                            serializer.fragment("opts"),
+                            serializer.index(parent, "opts"),
+                            plugin.opts_extend
+                        )[1]
+                        .. " end")
                 end
-                if serializer.can_serialize(spec) then
-                    table.insert(spec_plugins, spec)
-                else
-                    local function unserializable(o, p)
-                        if type(o) ~= "table" or getmetatable(o) == serializer.Fragment then
-                            return not serializer.can_serialize(o) and p or nil
-                        end
-                        if getmetatable(o) then
-                            return p
-                        end
-                        for k, v in pairs(o) do
-                            if not serializer.can_serialize(k) then
-                                return p .. "/<key " .. tostring(k) .. ">"
-                            end
-                            local found = unserializable(v, p .. "/" .. tostring(k))
-                            if found then
-                                return found
-                            end
-                        end
-                    end
-                    -- the require() fallback would silently drop the triggers recorded for this plugin
-                    error(("lazier: cannot compile spec of %s: %s is not serializable"):format(
-                        tostring(plugin[1] or plugin.dir or plugin.url), unserializable(spec, "spec") or "?"))
-                end
+                local counts = {}
+                count_tables(spec, counts)
+                table.insert(spec_plugins,
+                    fragment_spec(parent, spec, {}, counts) or serializer.fragment(parent))
             end
         end
     end
