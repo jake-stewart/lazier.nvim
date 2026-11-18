@@ -171,8 +171,8 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
                         name = lazy_plugin.name,
                         rtp = lazy_plugin.dir,
                         priority = lazy_plugin.priority,
-                        path = plugins_path,
-                        idx = listSchema and plugin_idx or nil,
+                        path = import or plugins_path,
+                        idx = listSchema and not import and plugin_idx or nil,
                         main = loader.get_main(lazy_plugin),
                     })
                 end
