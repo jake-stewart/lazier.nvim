@@ -89,6 +89,12 @@ require("lazier").setup("plugins", {
         --   false: never; they are just created when the plugin loads
         infer_events = "always",
 
+        -- whether buffers opened before lazy.nvim started, whose filetype
+        -- was already detected, rerun detection with the ftdetect of
+        -- plugins added since. undetected ones always do.
+        --   true: all, false: none, or a list of autocmd patterns ("*.conf")
+        redetect_filetype = false,
+
         -- automatically rebundle and compile nvim config when it changes
         -- if set to false then you will need to :LazierClear manually
         detect_changes = true,

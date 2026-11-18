@@ -48,6 +48,17 @@ local function after_lazy_start(opts, loadplugins, cache, rtps, has_lazier_rtp)
     if opts.lazier.after then
         opts.lazier.after()
     end
+    local redetect = opts.lazier.redetect_filetype
+    if redetect == nil then
+        redetect = false
+    end
+    assert(type(redetect) == "boolean" or vim.islist(redetect), "lazier: redetect_filetype must be a boolean or a list of patterns")
+    local function glob_hit(pattern, target, file)
+        if target == file and not pattern:find("/") then -- like nvim, slash-less file patterns match the tail
+            target = vim.fn.fnamemodify(file, ":t")
+        end
+        return vim.regex(vim.fn.glob2regpat(pattern)):match_str(target) ~= nil
+    end
     vim.schedule(function()
         local visible = {}
         for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
@@ -65,10 +76,19 @@ local function after_lazy_start(opts, loadplugins, cache, rtps, has_lazier_rtp)
                     local trigger = require("lazy.core.handler.event").trigger
                     local file = vim.api.nvim_buf_get_name(buf)
                     local detected = false -- its FileType then already reached every group
+                    local before = vim.bo[buf].filetype
+                    local wants_redetect = before == "" or redetect == true
+                        or type(redetect) == "table" and vim.iter(redetect):any(function(p) return glob_hit(p, file, file) end)
                     for _, ev in ipairs(events) do
-                        if ev == "BufReadPost" and vim.bo[buf].filetype == "" and vim.fn.exists("#filetypedetect#BufReadPost") == 1 then -- ftdetect of plugins added by lazy.setup lands in the old filetypedetect group
+                        if ev == "BufReadPost" and wants_redetect and vim.fn.exists("#filetypedetect#BufReadPost") == 1 then -- ftdetect of plugins added by lazy.setup lands in the old filetypedetect group
+                            local eventignore = vim.o.eventignore
+                            vim.opt.eventignore:append("FileType") -- an unchanged filetype must not refire every FileType handler
                             trigger({ event = ev, group = "filetypedetect", buffer = buf })
-                            detected = vim.bo[buf].filetype ~= ""
+                            vim.o.eventignore = eventignore
+                            if vim.bo[buf].filetype ~= before then
+                                vim.bo[buf].filetype = vim.bo[buf].filetype
+                                detected = true
+                            end
                         end
                         if detected and (ev == "FileType" or ev == "Syntax") then
                             goto continue
@@ -78,14 +98,7 @@ local function after_lazy_start(opts, loadplugins, cache, rtps, has_lazier_rtp)
                         local match = ev == "FileType" and vim.bo[buf].filetype or ev == "Syntax" and vim.bo[buf].syntax or file
                         for _, au in ipairs(vim.api.nvim_get_autocmds({ event = ev })) do
                             if not au.group and not old_ungrouped[ungrouped_key(au)] then
-                                local hit
-                                if au.buflocal then
-                                    hit = au.buffer == buf
-                                else
-                                    local target = (match == file and not au.pattern:find("/")) and vim.fn.fnamemodify(file, ":t") or match -- like nvim, slash-less file patterns match the tail
-                                    hit = vim.regex(vim.fn.glob2regpat(au.pattern)):match_str(target) ~= nil
-                                end
-                                if hit then
+                                if au.buflocal and au.buffer == buf or not au.buflocal and glob_hit(au.pattern, match, file) then
                                     if au.once then
                                         vim.api.nvim_del_autocmd(assert(au.id, "vimscript ++once autocmds carry no id to delete by"))
                                     end
