@@ -181,7 +181,9 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
                         main = loader.get_main(lazy_plugin),
                     })
                 end
-                local spec = vim.deepcopy(plugin)
+                -- lazy chains a spec to earlier specs of the same plugin via a metatable; those are compiled
+                -- as their own entries, and a metatable on the entry makes it unserializable
+                local spec = setmetatable(vim.deepcopy(plugin), nil)
                 spec.keys = lazy_plugin.keys
                 spec.event = lazy_plugin.event
                 spec.ft = lazy_plugin.ft
@@ -201,7 +203,26 @@ local function compile_user(module, opts, cache, rtps, has_lazier_rtp)
                 if serializer.can_serialize(spec) then
                     table.insert(spec_plugins, spec)
                 else
-                    table.insert(spec_plugins, parent)
+                    local function unserializable(o, p)
+                        if type(o) ~= "table" or getmetatable(o) == serializer.Fragment then
+                            return not serializer.can_serialize(o) and p or nil
+                        end
+                        if getmetatable(o) then
+                            return p
+                        end
+                        for k, v in pairs(o) do
+                            if not serializer.can_serialize(k) then
+                                return p .. "/<key " .. tostring(k) .. ">"
+                            end
+                            local found = unserializable(v, p .. "/" .. tostring(k))
+                            if found then
+                                return found
+                            end
+                        end
+                    end
+                    -- the require() fallback would silently drop the triggers recorded for this plugin
+                    error(("lazier: cannot compile spec of %s: %s is not serializable"):format(
+                        tostring(plugin[1] or plugin.dir or plugin.url), unserializable(spec, "spec") or "?"))
                 end
             end
         end
