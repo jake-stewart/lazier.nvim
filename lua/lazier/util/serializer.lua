@@ -28,6 +28,8 @@ local M = {}
 
 M.Fragment = {}
 
+local dict_metatable = getmetatable(vim.empty_dict())
+
 function M.fragment(s)
     return setmetatable({ tostring(s) }, M.Fragment)
 end
@@ -73,7 +75,7 @@ function M.valid_identifier(s)
     if type(s) ~= "string" then
         return false
     end
-    if not s:match("^[a-zA-Z_]+[a-zA-Z0-9_]$") then
+    if not s:match("^[a-zA-Z_][a-zA-Z0-9_]*$") then
         return false
     end
     return not RESERVED_WORDS[s]
@@ -82,11 +84,31 @@ end
 function M.serialize(o, depth, max_line_length)
     max_line_length = max_line_length or 80
     if type(o) == "string" then
-        return '"' .. o:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n") .. '"'
-    elseif type(o) == "number" or type(o) == "boolean" or o == nil then
+        return ("%q"):format(o)
+    elseif type(o) == "number" then
+        if o ~= o then
+            return "0/0"
+        elseif o == math.huge then
+            return "math.huge"
+        elseif o == -math.huge then
+            return "-math.huge"
+        elseif tonumber(tostring(o)) == o then
+            return tostring(o)
+        end
+        return ("%.17g"):format(o)
+    elseif type(o) == "boolean" or o == nil then
         return tostring(o)
+    elseif o == vim.NIL then
+        return "vim.NIL"
     elseif getmetatable(o) == M.Fragment then
         return o[1]
+    elseif getmetatable(o) == dict_metatable then
+        if next(o) == nil then
+            return "vim.empty_dict()"
+        end
+        return "setmetatable("
+            .. M.serialize(setmetatable(vim.deepcopy(o), nil), depth, max_line_length)
+            .. ", getmetatable(vim.empty_dict()))"
     elseif type(o) == "table" then
         local buffer = {}
         local last_index = 0
@@ -131,23 +153,30 @@ function M.serialize(o, depth, max_line_length)
     end
 end
 
-function M.can_serialize(o)
+function M.can_serialize(o, seen)
     if type(o) == "string"
         or type(o) == "number"
         or type(o) == "boolean"
         or o == nil
+        or o == vim.NIL
     then
         return true
     elseif type(o) == "table" then
         local metatable = getmetatable(o)
         if metatable == M.Fragment then
             return true
-        elseif metatable then
+        elseif metatable and metatable ~= dict_metatable then
             return false
         end
+        seen = seen or {}
+        if seen[o] then
+            return false
+        end
+        seen[o] = true
         for k, v in pairs(o) do
-            if not M.can_serialize(k)
-                or not M.can_serialize(v)
+            if type(k) == "table"
+                or not M.can_serialize(k)
+                or not M.can_serialize(v, seen)
             then
                 return false
             end
