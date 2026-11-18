@@ -46,7 +46,6 @@ return function(spec, infer_events)
         if plugin.enabled == false or plugin.lazy == false then
         else
             local pluginConfig = plugin.config
-            -- inferred triggers only fill in for ones the spec didn't declare
             local declares_triggers = plugin.lazy == true
                 or plugin.keys ~= nil
                 or plugin.cmd ~= nil
@@ -67,6 +66,7 @@ return function(spec, infer_events)
                         end
                     end
                     plugin.lazy = isPluginLazy
+                    local loading = require("lazy.core.loader").loading
                     local wrappers = {
                         keymaps = { obj = vim.keymap, name = "set" },
                         events = { obj = vim.api, name = "nvim_create_autocmd" },
@@ -76,16 +76,14 @@ return function(spec, infer_events)
                         wrapper.calls = {}
                         wrapper.obj[wrapper.name] = function(...)
                             local ret = wrapper.original(...)
-                            if state.loading[#state.loading] == lazyPlugin.name then
+                            if loading[#loading] == lazyPlugin then
                                 table.insert(wrapper.calls, np.pack(...))
                             end
                             return ret
                         end
                     end
-                    -- snapshot here, not once per session: commands other plugins and the user's own config
-                    -- create between two wrapped configs would otherwise become triggers of the next one;
-                    -- claimed ones come from plugins this config pulled in
-                    local commands = vim.api.nvim_get_commands({ builtin = false })
+                    local commands = state.commands[lazyPlugin.name]
+                        or vim.api.nvim_get_commands({ builtin = false })
                     local success, result = pcall(pluginConfig)
                     for _, wrapper in pairs(wrappers) do
                         wrapper.obj[wrapper.name] = wrapper.original
@@ -105,7 +103,9 @@ return function(spec, infer_events)
                         else
                             plugin.cmd = {}
                         end
-                        table.insert(plugin.cmd --[[ @as any ]], k)
+                        if not vim.tbl_contains(plugin.cmd --[[ @as any ]], k) then
+                            table.insert(plugin.cmd --[[ @as any ]], k)
+                        end
                       end
                     end
 
