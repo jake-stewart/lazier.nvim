@@ -29,11 +29,38 @@ local function after_lazy_start(opts, loadplugins, cache, rtps, has_lazier_rtp)
     if opts.lazier.after then
         opts.lazier.after()
     end
-    if vim.fn.expand("%") ~= "" then
-        vim.schedule(function()
-            pcall(vim.cmd.edit)
-        end)
-    elseif vim.o.ft ~= "" then
+    vim.schedule(function()
+        local visible = {}
+        for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+            visible[vim.api.nvim_win_get_buf(win)] = true
+        end
+        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+            if vim.api.nvim_buf_is_loaded(buf)
+                and vim.bo[buf].buftype == ""
+                and vim.api.nvim_buf_get_name(buf) ~= ""
+            then
+                local function reedit()
+                    if vim.api.nvim_buf_is_loaded(buf) then
+                        vim.api.nvim_buf_call(buf, function()
+                            pcall(vim.cmd.edit)
+                        end)
+                    end
+                end
+                if visible[buf] then
+                    reedit()
+                else
+                    vim.api.nvim_create_autocmd("BufEnter", {
+                        buffer = buf,
+                        once = true,
+                        callback = function()
+                            vim.schedule(reedit)
+                        end,
+                    })
+                end
+            end
+        end
+    end)
+    if vim.fn.expand("%") == "" and vim.o.ft ~= "" then
         vim.schedule(function()
             vim.cmd.setf(vim.o.ft)
         end)
